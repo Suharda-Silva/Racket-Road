@@ -56,7 +56,6 @@ function tokenize(line: string): string[] {
 
 async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
   const apiUrl = "https://onecompiler.com/api/code/exec";
-  // Generate a simple pseudo-unique ID for the request
   const uniqueId = `racketroad-${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
 
   const payload = {
@@ -68,11 +67,11 @@ async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
       language: "racket",
       files: [
         {
-          name: "main.rkt",
-          content: `#lang racket/base\n${racketCode}`, // Ensure #lang racket/base for compatibility
+          name: "main.rkt", // Or "HelloWorld.rkt" as per example
+          content: `#lang racket/base\n${racketCode}`,
         },
       ],
-      stdin: null,
+      stdin: null, // Assuming no standard input needed
     },
     user: { _id: null }, // Mimic structure
   };
@@ -88,27 +87,26 @@ async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
 
     if (!response.ok) {
       const errorText = await response.text();
+      // It's important to return a string that starts with "Error:" for upstream logic
       return `Error: OneCompiler API request failed - ${response.status} ${response.statusText}. Details: ${errorText}`;
     }
 
     const data = await response.json();
 
-    if (data.properties && data.properties.result) {
-      const result = data.properties.result;
-      if (result.success) {
-        return result.stdout?.trim() || result.output?.trim() || "// OneCompiler: No output";
-      } else {
-        let errorOutput = "OneCompiler Evaluation Error: ";
-        if (result.stderr) errorOutput += result.stderr.trim();
-        if (result.exception) errorOutput += (result.stderr ? "\n" : "") + result.exception.trim();
-        if (!result.stderr && !result.exception) errorOutput += "Unknown error from OneCompiler.";
-        return `Error: ${errorOutput}`;
-      }
+    // Based on the new response structure provided by the user
+    if (data.stdout && !data.stderr && !data.exception) {
+      return data.stdout.trim() || "// OneCompiler: No output";
+    } else {
+      let errorOutput = "OneCompiler Evaluation Error: ";
+      if (data.stderr) errorOutput += data.stderr.trim();
+      if (data.exception) errorOutput += (data.stderr ? "\n" : "") + (typeof data.exception === 'string' ? data.exception.trim() : JSON.stringify(data.exception));
+      if (!data.stderr && !data.exception) errorOutput += "Unknown error from OneCompiler.";
+      return `Error: ${errorOutput}`;
     }
-    return "Error: Unexpected response structure from OneCompiler.";
   } catch (error) {
     console.error("Error calling OneCompiler API:", error);
-    return "Error: Could not connect to OneCompiler API.";
+    // Ensure this also returns a string starting with "Error:"
+    return `Error: Could not connect to OneCompiler API. ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 
@@ -175,7 +173,6 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
         else if (atomToken === '#t' || atomToken === '#f' || atomToken === '#true' || atomToken === '#false') { /* valid atom */ }
         else {
           // Potentially invalid atom if it doesn't match known forms and isn't quoted, etc.
-          // This part can be tricky without full language parsing. For now, we'll assume valid if it's a single token.
         }
         continue;
     }
@@ -189,7 +186,7 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
 
     const sExprTokens = tokens.slice(1, -1);
     if (sExprTokens.length === 0) {
-        continue;
+        continue; 
     }
 
     const head = sExprTokens[0];
@@ -229,7 +226,7 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
              }
           }
         } else if (head === 'list' || head === '+' || head === '-' || head === '=') {
-          // Variadic or zero-arg handling
+          // Variadic or zero-arg handling for these specific functions
         } else if (args.length < minExpectedArgs) {
            return { isValid: false, message: `Syntax Error on line ${i + 1}: Not enough arguments for '${head}'. Expected ${minExpectedArgs}, got ${args.length}.`, errorLineIndex: i, simulatedEvaluation: null };
         }
@@ -247,17 +244,16 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const aiNonAnswers = [
       "Error: AI evaluation did not produce an output.",
       "Error: Could not communicate with AI model for evaluation or AI output was not a valid string.",
-      // Add any specific AI refusal messages here if you configure the AI prompt for them
     ];
 
-    if (aiNonAnswers.includes(evaluationAttemptResult) || evaluationAttemptResult.trim() === "") {
+    if (aiNonAnswers.includes(evaluationAttemptResult) || evaluationAttemptResult.trim() === "" || evaluationAttemptResult.startsWith("Error: AI did not produce a parsable JSON")) {
       evaluationSource = "OneCompiler";
       evaluationAttemptResult = await evaluateWithOneCompiler(code);
     }
 
   } catch (e) {
     console.error("Error during initial evaluation attempt (AI):", e);
-    evaluationSource = "OneCompiler"; // Fallback if AI flow itself throws an unhandled error
+    evaluationSource = "OneCompiler"; 
     evaluationAttemptResult = await evaluateWithOneCompiler(code);
   }
 
@@ -268,14 +264,15 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     finalMessage = "Expression is empty.";
   } else if (isEvaluationValid) {
     finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`;
-  } else { // Error case
-    finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`; // Already starts with "Error:"
+  } else { 
+    finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`; 
   }
 
   return {
     isValid: isEvaluationValid,
     message: finalMessage,
     simulatedEvaluation: evaluationAttemptResult,
-    errorLineIndex: null // Line numbers from external evaluators are harder to map back reliably
+    errorLineIndex: null 
   };
 }
+
