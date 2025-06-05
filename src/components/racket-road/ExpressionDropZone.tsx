@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Sparkles, PlusCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPillCategoryColor } from '@/config/pills';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { checkSyntaxAction } from '@/app/actions/checkSyntaxAction';
-import { generateRacketCode } from './LiveCodeView'; 
+import { generateRacketCode } from './LiveCodeView';
 import { useToast } from '@/hooks/use-toast';
 
 interface ExpressionDropZoneProps {
@@ -21,7 +21,7 @@ interface ExpressionDropZoneProps {
 
 const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | null => {
   if (currentSequence.length === 0) {
-    return 'keyword'; 
+    return 'keyword';
   }
 
   for (let i = currentSequence.length - 1; i >= 0; i--) {
@@ -32,7 +32,7 @@ const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | 
         return potentialFn.expects[argsProvidedCount];
       }
       if (argsProvidedCount >= potentialFn.expects.length) {
-        break; 
+        break;
       }
     }
   }
@@ -94,7 +94,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange, o
       if (currentTargetElement) {
         currentTargetElement.classList.add('animate-pop');
         setTimeout(() => {
-          if (currentTargetElement) { 
+          if (currentTargetElement) {
             currentTargetElement.classList.remove('animate-pop');
           }
         }, 300);
@@ -180,7 +180,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange, o
   };
 
   const handleCheckSyntax = async () => {
-    const codeToVerify = generateRacketCode(expressionLines); 
+    const codeToVerify = generateRacketCode(expressionLines);
 
     if (!codeToVerify.trim()) {
         toast({ title: "Empty Expression", description: "There's nothing to check.", variant: "default" });
@@ -200,7 +200,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange, o
         if (result.errorLineIndex !== undefined && result.errorLineIndex !== null) {
           setErrorLineHighlight(result.errorLineIndex);
         }
-        onEvaluationResultChange(null); 
+        onEvaluationResultChange(null);
       }
     } catch (error) {
       toast({ title: "Error", description: "Could not check syntax.", variant: "destructive" });
@@ -233,10 +233,10 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange, o
 
   return (
     <Card className="h-full flex flex-col shadow-xl">
-      <CardHeader className="p-4 border-b border-border flex justify-between items-center">
+      <CardHeader className="p-4 border-b flex justify-between items-center">
         <div>
-          <h2 className={cn("text-lg font-headline", "text-left")}>Expression Builder</h2>
-          <p className="text-sm text-muted-foreground">Drag pills here to build your Racket expressions.</p>
+          <CardTitle className="font-headline text-lg">Expression Builder</CardTitle>
+          <CardDescription className="text-sm">Drag pills here to build your Racket expressions.</CardDescription>
         </div>
         <Button variant="ghost" size="sm" onClick={addLine} title="Add new line">
           <PlusCircle className="mr-2 h-4 w-4" /> Add Line
