@@ -56,12 +56,12 @@ function tokenize(line: string): string[] {
 
 async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
   const apiUrl = "https://onecompiler.com/api/code/exec";
-  const staticId = "43kvxnj68"; // Use the specified static ID
+  const staticId = "43kvxnj68"; 
 
   const payload = {
-    _id: staticId, // Use static ID
+    _id: staticId, 
     type: "code",
-    title: staticId, // Use static ID
+    title: staticId, 
     visibility: "public",
     properties: {
       language: "racket",
@@ -92,16 +92,27 @@ async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
 
     const data = await response.json();
 
-    if (data.stdout && !data.stderr && !data.exception) {
-      return data.stdout.trim() || "// OneCompiler: No output";
-    } else {
-      let errorOutput = "OneCompiler Evaluation Error: ";
-      if (data.stderr) errorOutput += data.stderr.trim();
-      if (data.exception) errorOutput += (data.stderr ? "\n" : "") + (typeof data.exception === 'string' ? data.exception.trim() : JSON.stringify(data.exception));
-      if (!data.stderr && !data.exception && !data.stdout) errorOutput += "Unknown error or no output from OneCompiler.";
-      else if (!data.stderr && !data.exception && data.stdout) return data.stdout.trim(); // Handle case where stdout might exist with other null fields
-      return `Error: ${errorOutput}`;
+    // Check for explicit errors first
+    if (data.stderr || data.exception) {
+        let errorOutput = "";
+        if (data.stderr) errorOutput += String(data.stderr).trim();
+        if (data.exception) {
+            errorOutput += (data.stderr ? "\n" : "") + (typeof data.exception === 'string' ? String(data.exception).trim() : JSON.stringify(data.exception));
+        }
+        return `Error: ${errorOutput}`;
     }
+
+    // If no explicit errors, check stdout
+    // typeof data.stdout === 'string' handles cases where stdout might be null or undefined
+    if (typeof data.stdout === 'string') {
+        // If stdout is an empty string, it means no output, which is valid.
+        // Otherwise, return the trimmed stdout.
+        return data.stdout.trim() || "// OneCompiler: No output";
+    }
+    
+    // Fallback: If stdout is not a string (e.g. null) and no errors, implies no output.
+    return "// OneCompiler: No output";
+
   } catch (error) {
     console.error("Error calling OneCompiler API:", error);
     return `Error: Could not connect to OneCompiler API. ${error instanceof Error ? error.message : String(error)}`;
@@ -242,16 +253,14 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const aiNonAnswers = [
       "Error: AI evaluation did not produce an output.",
       "Error: Could not communicate with AI model for evaluation or AI output was not a valid string.",
-      "Error: AI did not produce a parsable JSON", // if the old error message still somehow slips through
+      "Error: AI did not produce a parsable JSON",
       "Error: No evaluation result was provided by the AI.",
       "// No output or evaluation from AI.",
     ];
-
-    // Check if the AI's response is empty, a non-answer, or an error explicitly from the AI itself (starts with "Error:")
-    // but allow actual Racket errors like "Error: division by zero" to be considered a valid AI attempt.
+    
     let aiFailedToEvaluate = aiNonAnswers.includes(evaluationAttemptResult) || 
                              evaluationAttemptResult.trim() === "" ||
-                             evaluationAttemptResult === "Error: AI evaluation did not produce an output." || // More specific checks
+                             evaluationAttemptResult === "Error: AI evaluation did not produce an output." ||
                              evaluationAttemptResult === "Error: Could not communicate with AI model for evaluation or AI output was not a valid string.";
 
 
@@ -276,7 +285,6 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
   } else if (isEvaluationValid) {
     finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`;
   } else { 
-    // If it starts with "Error:", it could be a Racket error or an API error
     finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`; 
   }
 
