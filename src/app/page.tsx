@@ -1,9 +1,21 @@
+
 import { PillPalette } from '@/components/racket-road/PillPalette';
 import { ExpressionDropZone } from '@/components/racket-road/ExpressionDropZone';
 import { RacketRoadLogo } from '@/components/racket-road/RacketRoadLogo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { HelpCircle } from 'lucide-react';
 
 export default function RacketRoadPage() {
+  const howToPlayItems = [
+    <>Drag pills from the <strong className="text-primary">Pill Palette</strong> on the left.</>,
+    <>Drop them into the <strong className="text-accent">Expression Builder</strong> on the right.</>,
+    "Pills are color-coded: Purple (functions), Blue (conditions/operators), Orange (variables/numbers), Green (strings).",
+    "A colored dot or placeholder indicates what type of pill might be expected next.",
+    "Click on a pill in the builder to remove it.",
+    <>Use the <strong className="text-foreground">Check Syntax</strong> button to get AI feedback (simulated).</>
+  ];
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="p-4 border-b sticky top-0 bg-background/80 backdrop-blur-md z-10">
@@ -16,8 +28,29 @@ export default function RacketRoadPage() {
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto py-8 px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full md:min-h-[calc(100vh-200px)]">
+      <div className="container mx-auto py-4 px-4">
+        <Accordion type="single" collapsible className="w-full bg-card shadow-sm rounded-lg border">
+          <AccordionItem value="how-to-play" className="border-b-0">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <div className="flex items-center gap-2 text-base font-semibold text-primary">
+                <HelpCircle className="h-5 w-5" />
+                <span>How to Play</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <p className="text-sm text-muted-foreground mb-2">Construct Racket list expressions by dragging pills.</p>
+              <ul className="list-disc list-inside space-y-1 text-sm text-card-foreground">
+                {howToPlayItems.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
+
+      <main className="flex-grow container mx-auto pt-4 pb-8 px-4"> {/* Adjusted pt */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full md:min-h-[calc(100vh-280px)]"> {/* Adjusted min-h */}
           <div className="md:col-span-1 h-full min-h-[300px] md:min-h-0">
             <PillPalette />
           </div>
@@ -25,23 +58,6 @@ export default function RacketRoadPage() {
             <ExpressionDropZone />
           </div>
         </div>
-        
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="font-headline">How to Play</CardTitle>
-            <CardDescription>Construct Racket list expressions by dragging pills.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Drag pills from the <strong className="text-primary">Pill Palette</strong> on the left.</li>
-              <li>Drop them into the <strong className="text-accent">Expression Builder</strong> on the right.</li>
-              <li>Pills are color-coded: Purple (functions), Blue (conditions/operators), Orange (variables/numbers), Green (strings).</li>
-              <li>A colored dot or placeholder indicates what type of pill might be expected next.</li>
-              <li>Click on a pill in the builder to remove it.</li>
-              <li>Use the <strong className="text-foreground">Check Syntax</strong> button to get AI feedback (simulated).</li>
-            </ul>
-          </CardContent>
-        </Card>
       </main>
 
       <footer className="p-4 border-t text-center text-sm text-muted-foreground">

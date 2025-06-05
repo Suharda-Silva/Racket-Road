@@ -1,3 +1,4 @@
+
 import type { PillSpec, PillCategory } from '@/types';
 
 export const PILL_SPECS: PillSpec[] = [
@@ -139,9 +140,10 @@ export const PILL_SPECS: PillSpec[] = [
   { id: 'num-0', label: '0', category: 'number', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
 ];
 
-// Helper to get pill color based on category
+// Helper to get pill color based on category for the dot indicator
 export const getPillCategoryColor = (category: PillCategory | null): string => {
-  if (!category) return 'bg-muted'; 
+  if (!category) return 'bg-muted'; // Default dot color if no specific category is expected
+  // These directly return Tailwind background color classes
   switch (category) {
     case 'keyword': return 'bg-pill-keyword';
     case 'function': return 'bg-pill-function';
@@ -150,6 +152,6 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     case 'variable': return 'bg-pill-variable';
     case 'string': return 'bg-pill-string';
     case 'number': return 'bg-pill-number';
-    default: return 'bg-muted';
+    default: return 'bg-muted opacity-50'; // Fallback for the dot
   }
 };
