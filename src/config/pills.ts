@@ -78,7 +78,7 @@ export const PILL_SPECS: PillSpec[] = [
     expects: ['function', 'list_value', 'variable']
   },
 
-  // Conditions (Blue)
+  // Conditions & Predicates (Blue)
   {
     id: 'empty?',
     label: 'empty?',
@@ -158,7 +158,6 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     case 'list_value':
       // For the dot, 'list_value' can represent numbers or strings.
       // We'll default to the number color as a general 'value' indicator.
-      // Specific pills will use their explicit colors.
       return 'bg-pill-number'; 
     default: return 'bg-muted opacity-50'; 
   }
