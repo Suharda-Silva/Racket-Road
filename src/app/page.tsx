@@ -1,19 +1,28 @@
 
+'use client';
+
+import type { PlacedPill } from '@/types';
+import { useState } from 'react';
 import { PillPalette } from '@/components/racket-road/PillPalette';
 import { ExpressionDropZone } from '@/components/racket-road/ExpressionDropZone';
+import { LiveCodeView } from '@/components/racket-road/LiveCodeView';
 import { RacketRoadLogo } from '@/components/racket-road/RacketRoadLogo';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { HelpCircle } from 'lucide-react';
 
+const INITIAL_LINES = 1; // Start with one line
+
 export default function RacketRoadPage() {
+  const [expressionLines, setExpressionLines] = useState<PlacedPill[][]>(() => Array(INITIAL_LINES).fill(null).map(() => []));
+
   const howToPlayItems = [
     <>Drag pills from the <strong className="text-primary">Pill Palette</strong> on the left.</>,
     <>Drop them into the <strong className="text-accent">Expression Builder</strong> on the right.</>,
-    "Pills are color-coded: Purple (functions), Blue (conditions/operators), Orange (variables/numbers), Green (strings).",
+    "Pills are color-coded: Purple (functions), Blue (conditions/operators), Orange (variables/numbers), Green (strings), Grey (keywords).",
     "A colored dot or placeholder indicates what type of pill might be expected next.",
     "Click on a pill in the builder to remove it.",
-    <>Use the <strong className="text-foreground">Check Syntax</strong> button to get AI feedback (simulated).</>
+    <>Use the <strong className="text-foreground">Check Syntax</strong> button to get AI feedback (simulated).</>,
+    "Use the '+' button in the Expression Builder to add more lines for your code."
   ];
 
   return (
@@ -49,13 +58,17 @@ export default function RacketRoadPage() {
         </Accordion>
       </div>
 
-      <main className="flex-grow container mx-auto pt-4 pb-8 px-4"> {/* Adjusted pt */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full md:min-h-[calc(100vh-280px)]"> {/* Adjusted min-h */}
+      <main className="flex-grow container mx-auto pt-4 pb-8 px-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
           <div className="md:col-span-1 h-full min-h-[300px] md:min-h-0">
             <PillPalette />
           </div>
-          <div className="md:col-span-2 h-full min-h-[400px] md:min-h-0">
-            <ExpressionDropZone />
+          <div className="md:col-span-2 h-full flex flex-col gap-6">
+            <ExpressionDropZone
+              expressionLines={expressionLines}
+              onExpressionLinesChange={setExpressionLines}
+            />
+            <LiveCodeView expressionLines={expressionLines} />
           </div>
         </div>
       </main>
