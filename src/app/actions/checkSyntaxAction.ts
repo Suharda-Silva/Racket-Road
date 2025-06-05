@@ -56,24 +56,24 @@ function tokenize(line: string): string[] {
 
 async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
   const apiUrl = "https://onecompiler.com/api/code/exec";
-  const uniqueId = `racketroad-${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
+  const staticId = "43kvxnj68"; // Use the specified static ID
 
   const payload = {
-    _id: uniqueId,
+    _id: staticId, // Use static ID
     type: "code",
-    title: uniqueId,
+    title: staticId, // Use static ID
     visibility: "public",
     properties: {
       language: "racket",
       files: [
         {
-          name: "main.rkt", // Or "HelloWorld.rkt" as per example
+          name: "main.rkt", 
           content: `#lang racket/base\n${racketCode}`,
         },
       ],
-      stdin: null, // Assuming no standard input needed
+      stdin: null,
     },
-    user: { _id: null }, // Mimic structure
+    user: { _id: null },
   };
 
   try {
@@ -87,25 +87,23 @@ async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      // It's important to return a string that starts with "Error:" for upstream logic
       return `Error: OneCompiler API request failed - ${response.status} ${response.statusText}. Details: ${errorText}`;
     }
 
     const data = await response.json();
 
-    // Based on the new response structure provided by the user
     if (data.stdout && !data.stderr && !data.exception) {
       return data.stdout.trim() || "// OneCompiler: No output";
     } else {
       let errorOutput = "OneCompiler Evaluation Error: ";
       if (data.stderr) errorOutput += data.stderr.trim();
       if (data.exception) errorOutput += (data.stderr ? "\n" : "") + (typeof data.exception === 'string' ? data.exception.trim() : JSON.stringify(data.exception));
-      if (!data.stderr && !data.exception) errorOutput += "Unknown error from OneCompiler.";
+      if (!data.stderr && !data.exception && !data.stdout) errorOutput += "Unknown error or no output from OneCompiler.";
+      else if (!data.stderr && !data.exception && data.stdout) return data.stdout.trim(); // Handle case where stdout might exist with other null fields
       return `Error: ${errorOutput}`;
     }
   } catch (error) {
     console.error("Error calling OneCompiler API:", error);
-    // Ensure this also returns a string starting with "Error:"
     return `Error: Could not connect to OneCompiler API. ${error instanceof Error ? error.message : String(error)}`;
   }
 }
@@ -235,7 +233,7 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
   }
 
   // If all local syntax checks passed, proceed to AI evaluation or OneCompiler
-  let evaluationAttemptResult: string;
+  let evaluationAttemptResult: EvaluateRacketOutput;
   let evaluationSource = "AI";
 
   try {
@@ -244,9 +242,20 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const aiNonAnswers = [
       "Error: AI evaluation did not produce an output.",
       "Error: Could not communicate with AI model for evaluation or AI output was not a valid string.",
+      "Error: AI did not produce a parsable JSON", // if the old error message still somehow slips through
+      "Error: No evaluation result was provided by the AI.",
+      "// No output or evaluation from AI.",
     ];
 
-    if (aiNonAnswers.includes(evaluationAttemptResult) || evaluationAttemptResult.trim() === "" || evaluationAttemptResult.startsWith("Error: AI did not produce a parsable JSON")) {
+    // Check if the AI's response is empty, a non-answer, or an error explicitly from the AI itself (starts with "Error:")
+    // but allow actual Racket errors like "Error: division by zero" to be considered a valid AI attempt.
+    let aiFailedToEvaluate = aiNonAnswers.includes(evaluationAttemptResult) || 
+                             evaluationAttemptResult.trim() === "" ||
+                             evaluationAttemptResult === "Error: AI evaluation did not produce an output." || // More specific checks
+                             evaluationAttemptResult === "Error: Could not communicate with AI model for evaluation or AI output was not a valid string.";
+
+
+    if (aiFailedToEvaluate) {
       evaluationSource = "OneCompiler";
       evaluationAttemptResult = await evaluateWithOneCompiler(code);
     }
@@ -262,9 +271,12 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
 
   if (isEvaluationValid && evaluationAttemptResult === "// Expression is empty") {
     finalMessage = "Expression is empty.";
+  } else if (isEvaluationValid && evaluationAttemptResult === "// OneCompiler: No output") {
+    finalMessage = `${evaluationSource} Check: No output produced.`;
   } else if (isEvaluationValid) {
     finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`;
   } else { 
+    // If it starts with "Error:", it could be a Racket error or an API error
     finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`; 
   }
 
