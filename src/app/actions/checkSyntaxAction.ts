@@ -3,13 +3,14 @@
 
 import type { PillSpec } from '@/types';
 import { PILL_SPECS } from '@/config/pills';
-import { evaluateRacket, type EvaluateRacketOutput } from '@/ai/flows/evaluate-racket-flow'; // Output type might not be needed if it's just string
+import { evaluateRacket, type EvaluateRacketOutput } from '@/ai/flows/evaluate-racket-flow';
+import { generateRacketCode } from '@/components/racket-road/LiveCodeView';
 
 interface SyntaxCheckResult {
   isValid: boolean;
   message: string;
   errorLineIndex?: number | null;
-  simulatedEvaluation?: string | null; 
+  simulatedEvaluation?: string | null;
 }
 
 const findPillSpecByLabel = (label: string): PillSpec | undefined => {
@@ -26,7 +27,7 @@ function tokenize(line: string): string[] {
         if (char === '"') {
             inString = !inString;
             currentToken += char;
-            if (!inString || i === line.length - 1) { 
+            if (!inString || i === line.length - 1) {
                 if (currentToken) tokens.push(currentToken);
                 currentToken = "";
             }
@@ -51,6 +52,64 @@ function tokenize(line: string): string[] {
         tokens.push(currentToken.trim());
     }
     return tokens;
+}
+
+async function evaluateWithOneCompiler(racketCode: string): Promise<string> {
+  const apiUrl = "https://onecompiler.com/api/code/exec";
+  // Generate a simple pseudo-unique ID for the request
+  const uniqueId = `racketroad-${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
+
+  const payload = {
+    _id: uniqueId,
+    type: "code",
+    title: uniqueId,
+    visibility: "public",
+    properties: {
+      language: "racket",
+      files: [
+        {
+          name: "main.rkt",
+          content: `#lang racket/base\n${racketCode}`, // Ensure #lang racket/base for compatibility
+        },
+      ],
+      stdin: null,
+    },
+    user: { _id: null }, // Mimic structure
+  };
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return `Error: OneCompiler API request failed - ${response.status} ${response.statusText}. Details: ${errorText}`;
+    }
+
+    const data = await response.json();
+
+    if (data.properties && data.properties.result) {
+      const result = data.properties.result;
+      if (result.success) {
+        return result.stdout?.trim() || result.output?.trim() || "// OneCompiler: No output";
+      } else {
+        let errorOutput = "OneCompiler Evaluation Error: ";
+        if (result.stderr) errorOutput += result.stderr.trim();
+        if (result.exception) errorOutput += (result.stderr ? "\n" : "") + result.exception.trim();
+        if (!result.stderr && !result.exception) errorOutput += "Unknown error from OneCompiler.";
+        return `Error: ${errorOutput}`;
+      }
+    }
+    return "Error: Unexpected response structure from OneCompiler.";
+  } catch (error) {
+    console.error("Error calling OneCompiler API:", error);
+    return "Error: Could not connect to OneCompiler API.";
+  }
 }
 
 
@@ -110,13 +169,17 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const isLikelyAtom = tokens.length === 1 && !tokens[0].includes('(') && !tokens[0].includes(')');
     if (isLikelyAtom) {
         const atomToken = tokens[0];
-        if (/^\d+(\.\d+)?$/.test(atomToken)) { /* valid atom */ } 
-        else if (/^".*"$/.test(atomToken)) { /* valid atom */ } 
-        else if (/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(atomToken)) { /* valid atom */ } 
+        if (/^\d+(\.\d+)?$/.test(atomToken)) { /* valid atom */ }
+        else if (/^".*"$/.test(atomToken)) { /* valid atom */ }
+        else if (/^[a-zA-Z_?!+\-*\/<>=#][\w?!+\-*\/<>=.#:]*$/.test(atomToken) && !/^\d/.test(atomToken)) { /* valid variable/symbol */ }
         else if (atomToken === '#t' || atomToken === '#f' || atomToken === '#true' || atomToken === '#false') { /* valid atom */ }
-        continue; 
+        else {
+          // Potentially invalid atom if it doesn't match known forms and isn't quoted, etc.
+          // This part can be tricky without full language parsing. For now, we'll assume valid if it's a single token.
+        }
+        continue;
     }
-    
+
     if (tokens[0] !== '(') {
       return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to start with '('. Found: '${tokens[0]}...'`, errorLineIndex: i, simulatedEvaluation: null };
     }
@@ -124,8 +187,8 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
       return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to end with ')'. Line: ${originalLinesForContext[i]}`, errorLineIndex: i, simulatedEvaluation: null };
     }
 
-    const sExprTokens = tokens.slice(1, -1); 
-    if (sExprTokens.length === 0) { 
+    const sExprTokens = tokens.slice(1, -1);
+    if (sExprTokens.length === 0) {
         continue;
     }
 
@@ -133,31 +196,31 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const args = sExprTokens.slice(1);
 
     if (/^\d+(\.\d+)?$/.test(head) || (/^".*"$/.test(head) && head !== '""') ) {
-      if (sExprTokens.length > 1) { 
+      if (sExprTokens.length > 1) {
          return { isValid: false, message: `Syntax Error on line ${i + 1}: Operator/function expected. Found value '${head}' at the start of an expression.`, errorLineIndex: i, simulatedEvaluation: null };
       }
     }
-    
+
     const spec = findPillSpecByLabel(head);
 
     if (spec) {
       if (spec.expects) {
-        const minExpectedArgs = spec.expects.length; 
-        
+        const minExpectedArgs = spec.expects.length;
+
         if (head === 'define') {
-          if (args.length < 1) { 
+          if (args.length < 1) {
             return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' needs at least a name and a value/body. Example: (define x 10).`, errorLineIndex: i, simulatedEvaluation: null };
           }
           const varOrFuncName = args[0];
-          if (varOrFuncName.startsWith('(') && varOrFuncName.endsWith(')')) { 
+          if (varOrFuncName.startsWith('(') && varOrFuncName.endsWith(')')) {
             const funcDefTokens = tokenize(varOrFuncName);
-            if (funcDefTokens.length < 2 || funcDefTokens[0] !== '(' || funcDefTokens[funcDefTokens.length-1] !== ')') { 
+            if (funcDefTokens.length < 2 || funcDefTokens[0] !== '(' || funcDefTokens[funcDefTokens.length-1] !== ')') {
                  return { isValid: false, message: `Syntax Error on line ${i + 1}: Malformed function definition in 'define'. Expected (define (func-name args...) body).`, errorLineIndex: i, simulatedEvaluation: null };
             }
-            if (args.length < 2) { 
+            if (args.length < 2) {
                  return { isValid: false, message: `Syntax Error on line ${i + 1}: Function definition in 'define' is missing a body.`, errorLineIndex: i, simulatedEvaluation: null };
             }
-          } else { 
+          } else {
              if (args.length < 2) {
                 return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' expects a variable and a value. Example: (define x 10).`, errorLineIndex: i, simulatedEvaluation: null };
              }
@@ -173,41 +236,46 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
       }
     }
   }
-  
-  // If all local syntax checks passed, proceed to AI evaluation
-  try {
-    // evaluateRacket now returns Promise<string>
-    const aiResponseString = await evaluateRacket({ racketCode: code });
-    
-    const isAIValid = !aiResponseString.startsWith("Error:");
-    let finalMessage = aiResponseString; // The AI response is the message
 
-    if (isAIValid && aiResponseString === "// Expression is empty") {
-      finalMessage = "Expression is empty."; // Nicer message for this specific case
-    } else if (isAIValid) {
-      // For other valid cases, we might prepend a success indicator for the toast.
-      // The AI string itself is the primary evaluation detail.
-      finalMessage = `AI Check: ${aiResponseString}`;
-    } else {
-      // For errors, the AI string already starts with "Error:"
-      finalMessage = `AI Check: ${aiResponseString}`;
+  // If all local syntax checks passed, proceed to AI evaluation or OneCompiler
+  let evaluationAttemptResult: string;
+  let evaluationSource = "AI";
+
+  try {
+    evaluationAttemptResult = await evaluateRacket({ racketCode: code });
+
+    const aiNonAnswers = [
+      "Error: AI evaluation did not produce an output.",
+      "Error: Could not communicate with AI model for evaluation or AI output was not a valid string.",
+      // Add any specific AI refusal messages here if you configure the AI prompt for them
+    ];
+
+    if (aiNonAnswers.includes(evaluationAttemptResult) || evaluationAttemptResult.trim() === "") {
+      evaluationSource = "OneCompiler";
+      evaluationAttemptResult = await evaluateWithOneCompiler(code);
     }
 
-    return { 
-      isValid: isAIValid,
-      message: finalMessage, 
-      simulatedEvaluation: aiResponseString, // Store the direct AI string
-      errorLineIndex: null // AI doesn't reliably give line numbers for evaluation errors
-    };
-
   } catch (e) {
-    console.error("Error calling AI evaluation flow:", e);
-    return {
-      isValid: false, 
-      message: "AI Evaluation Service Error: Could not get simulated output. Please try again.",
-      simulatedEvaluation: "// AI evaluation service failed.",
-      errorLineIndex: null
-    };
+    console.error("Error during initial evaluation attempt (AI):", e);
+    evaluationSource = "OneCompiler"; // Fallback if AI flow itself throws an unhandled error
+    evaluationAttemptResult = await evaluateWithOneCompiler(code);
   }
-}
 
+  const isEvaluationValid = !evaluationAttemptResult.startsWith("Error:");
+  let finalMessage = evaluationAttemptResult;
+
+  if (isEvaluationValid && evaluationAttemptResult === "// Expression is empty") {
+    finalMessage = "Expression is empty.";
+  } else if (isEvaluationValid) {
+    finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`;
+  } else { // Error case
+    finalMessage = `${evaluationSource} Check: ${evaluationAttemptResult}`; // Already starts with "Error:"
+  }
+
+  return {
+    isValid: isEvaluationValid,
+    message: finalMessage,
+    simulatedEvaluation: evaluationAttemptResult,
+    errorLineIndex: null // Line numbers from external evaluators are harder to map back reliably
+  };
+}
