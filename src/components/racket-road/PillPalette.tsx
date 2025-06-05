@@ -10,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { cn } from '@/lib/utils';
 
 const CATEGORY_DISPLAY_NAMES: Record<PillCategory, string> = {
   keyword: 'Keywords',
@@ -51,9 +52,12 @@ export function PillPalette() {
                 <AccordionContent className="pb-2 pl-2 pr-1 pt-1">
                   <div className="grid grid-cols-2 gap-2">
                     {groupedPills[category].map((spec) => (
-                      <Pill 
-                        key={spec.id} 
-                        pill={spec} 
+                      <Pill
+                        key={spec.id}
+                        pill={spec}
+                        className={cn(
+                          spec.id === 'num-long-sequence' ? 'col-span-2' : ''
+                        )}
                         draggable={true}
                         showGrip={true}
                         onDragStart={(e) => {
