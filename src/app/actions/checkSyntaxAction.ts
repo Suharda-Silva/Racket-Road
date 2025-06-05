@@ -167,39 +167,58 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
           }
         } else if (head === 'list' || head === '+' || head === '-' || head === '=') {
           if ((head === '+' || head === '-' || head === '=') && args.length === 0 && spec.expects.length > 0) {
+             // These can be called with zero arguments in some contexts, but our pills expect some by default.
+             // For strictness, one could enforce args.length >= 1 if spec.expects implies it.
+             // For now, this is a soft check.
           }
         } else if (args.length < minExpectedArgs) {
            return { isValid: false, message: `Syntax Error on line ${i + 1}: Not enough arguments for '${head}'. Expected ${minExpectedArgs}, got ${args.length}.`, errorLineIndex: i };
         }
       }
     } else {
+      // Unknown function/operator. Could be user-defined. Heuristic check for symbol-like name.
       if (!/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(head) && !head.startsWith("'") && head !== "...") {
+        // It's not a typical symbol. Could be an error or advanced Racket.
+        // For this tool, we might flag it if it's not a quoted list or a known construct.
+        // But for now, we'll be lenient on unknown heads if they look like symbols.
       }
     }
   }
   
-  let simulatedEvaluation: string | null = "Evaluation display area. (Actual evaluation not implemented)";
-  const trimmedCode = code.trim();
+  // If all checks passed, determine simulated evaluation
+  const nonEmptyContentLines = originalLinesForContext.filter(line => line.trim() !== '');
+  let determinedSimulatedEvaluation: string | null;
 
-  if (lines.length === 1) { // Very simple simulation for single line expressions
-    if (trimmedCode === "(+ 1 2)") {
-      simulatedEvaluation = "3";
-    } else if (trimmedCode === "(list 1 2 3)") {
-      simulatedEvaluation = "'(1 2 3)";
-    } else if (trimmedCode === "(define x 10)") {
-      simulatedEvaluation = "// x defined";
-    } else if (trimmedCode.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)) {
-       simulatedEvaluation = `// ${trimmedCode.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)?.[1]} defined`;
-    } else if (/^\([\w?!+\-*\/<>=.]+(\s+[\w".?!+\-*\/<>=]+)*\)$/.test(trimmedCode)) {
-       simulatedEvaluation = "Expression is valid. (Simulated output)";
-    } else if (!trimmedCode.includes('(') && !trimmedCode.includes(')') && trimmedCode.length > 0) {
-        simulatedEvaluation = trimmedCode; // Echo atoms
+  if (nonEmptyContentLines.length === 0) {
+    // This case is handled by the early return for empty code.
+    // If somehow reached, this is a fallback.
+    determinedSimulatedEvaluation = "// Expression is empty";
+  } else if (nonEmptyContentLines.length === 1) {
+    const singleLineTrimmed = nonEmptyContentLines[0].trim();
+    if (singleLineTrimmed === "(+ 1 2)") {
+      determinedSimulatedEvaluation = "3";
+    } else if (singleLineTrimmed === "(list 1 2 3)") {
+      determinedSimulatedEvaluation = "'(1 2 3)";
+    } else if (singleLineTrimmed === "(define x 10)") {
+      determinedSimulatedEvaluation = "// x defined";
+    } else if (singleLineTrimmed.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)) {
+      const match = singleLineTrimmed.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/);
+      determinedSimulatedEvaluation = `// ${match?.[1]} defined`;
+    } else if (/^\([\w?!+\-*\/<>=.]+(\s+[\w".?!+\-*\/<>=]+)*\)$/.test(singleLineTrimmed)) { // any other s-expr
+      determinedSimulatedEvaluation = "Value from expression. (Simulated)";
+    } else if (!singleLineTrimmed.includes('(') && !singleLineTrimmed.includes(')') && singleLineTrimmed.length > 0) { // atom
+      determinedSimulatedEvaluation = singleLineTrimmed; // Echo atom
+    } else {
+      // For example, if the line is just '()' or something that passed validation but isn't a typical expression.
+      determinedSimulatedEvaluation = "Expression valid. (Simulated output)";
     }
-  } else if (lines.length > 1) {
-    simulatedEvaluation = "Multiple lines are valid. (Simulated output for multi-line)";
+  } else { // Multiple non-empty lines
+    determinedSimulatedEvaluation = "Final result of evaluation. (Simulated)";
   }
 
-
-  return { isValid: true, message: "AI Check: Syntax appears plausible (enhanced heuristics).", simulatedEvaluation };
+  return { 
+    isValid: true, 
+    message: "AI Check: Syntax appears plausible (enhanced heuristics).", 
+    simulatedEvaluation: determinedSimulatedEvaluation 
+  };
 }
-
