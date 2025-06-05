@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { getPillCategoryColor } from '@/config/pills';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { checkSyntaxAction } from '@/app/actions/checkSyntaxAction';
+import { generateRacketCode } from './LiveCodeView'; // Import the function
 import { useToast } from '@/hooks/use-toast';
 
 interface ExpressionDropZoneProps {
@@ -19,24 +20,32 @@ interface ExpressionDropZoneProps {
 
 const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | null => {
   if (currentSequence.length === 0) {
-    return 'keyword';
+    return 'keyword'; // Typically, a Racket line might start with a keyword or function
   }
 
   for (let i = currentSequence.length - 1; i >= 0; i--) {
     const potentialFn = currentSequence[i];
-    if ((potentialFn.category === 'function' || potentialFn.category === 'keyword' || potentialFn.category === 'operator') && potentialFn.expects) {
+    if ((potentialFn.category === 'function' || potentialFn.category === 'keyword' || potentialFn.category === 'operator' || potentialFn.category === 'condition') && potentialFn.expects) {
       const argsProvidedCount = currentSequence.length - 1 - i;
       if (argsProvidedCount < potentialFn.expects.length) {
         return potentialFn.expects[argsProvidedCount];
       }
+      // If all expected args for this function are provided, we might be done with this s-expression part.
+      // Or it could be a variadic function. For simplicity, if all defined 'expects' are met,
+      // we consider it complete for *this* function, and won't suggest another argument for it.
+      // Further pills would either start a new expression or be an error (handled by syntax check)
       if (argsProvidedCount >= potentialFn.expects.length) {
-        break;
+        break; // Stop looking for expects from this function
       }
     }
   }
+  // If the last pill is terminal (like a variable or literal value not expecting more)
   const lastPill = currentSequence[currentSequence.length - 1];
   if (lastPill.isTerminal) return null;
 
+  // Default: if no specific expectation is derived, don't show a dot.
+  // Or, one could argue to expect 'list_value' if inside a list, or another 'function' etc.
+  // For now, keeping it null means the dot only shows when a function/operator explicitly expects something.
   return null;
 };
 
@@ -66,13 +75,13 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
 
   const handleDropOnLine = useCallback((e: React.DragEvent<HTMLDivElement>, targetLineIdx: number) => {
     e.preventDefault();
-    const currentTargetElement = e.currentTarget; // Capture the element
+    const currentTargetElement = e.currentTarget as HTMLDivElement;
     setDraggedOverLineIndex(null);
     resetErrorHighlight();
     const newLines = [...expressionLines];
 
     if (e.dataTransfer.types.includes('application/racket-placed-pill')) {
-      const { lineIndex: sourceLineIdx, pillIndex: sourcePillIdx, instanceId: draggedInstanceId } = JSON.parse(e.dataTransfer.getData('application/racket-placed-pill'));
+      const { lineIndex: sourceLineIdx, instanceId: draggedInstanceId } = JSON.parse(e.dataTransfer.getData('application/racket-placed-pill'));
       const draggedPill = newLines[sourceLineIdx]?.find(p => p.instanceId === draggedInstanceId);
 
       if (draggedPill) {
@@ -92,7 +101,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       if (currentTargetElement) {
         currentTargetElement.classList.add('animate-pop');
         setTimeout(() => {
-          if (currentTargetElement) {
+          if (currentTargetElement) { // Check if element still exists
             currentTargetElement.classList.remove('animate-pop');
           }
         }, 300);
@@ -102,21 +111,21 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
 
   const handleDropOnPill = useCallback((e: React.DragEvent<HTMLDivElement>, targetLineIdx: number, targetPillIdx: number) => {
     e.preventDefault();
-    e.stopPropagation(); 
+    e.stopPropagation();
     setDraggedOverPillInfo(null);
     resetErrorHighlight();
     const newLines = [...expressionLines];
 
     if (e.dataTransfer.types.includes('application/racket-placed-pill')) {
       const { lineIndex: sourceLineIdx, pillIndex: sourcePillIdx, instanceId: draggedInstanceId } = JSON.parse(e.dataTransfer.getData('application/racket-placed-pill'));
-      
+
       if (sourceLineIdx === targetLineIdx && sourcePillIdx === targetPillIdx) return;
 
       const draggedPill = newLines[sourceLineIdx]?.find(p => p.instanceId === draggedInstanceId);
 
       if (draggedPill) {
         newLines[sourceLineIdx] = newLines[sourceLineIdx].filter(p => p.instanceId !== draggedInstanceId);
-        
+
         let adjustedTargetPillIdx = targetPillIdx;
         if (sourceLineIdx === targetLineIdx && sourcePillIdx < targetPillIdx) {
           adjustedTargetPillIdx--;
@@ -150,7 +159,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDraggedOverLineIndex(lineIndex);
-    setDraggedOverPillInfo(null); 
+    setDraggedOverPillInfo(null);
   };
 
   const handleDragOverPill = (e: React.DragEvent<HTMLDivElement>, lineIndex: number, pillIndex: number) => {
@@ -158,13 +167,13 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setDraggedOverPillInfo({ lineIndex, pillIndex });
-    setDraggedOverLineIndex(lineIndex); 
+    setDraggedOverLineIndex(lineIndex);
   };
 
   const handleDragLeaveLine = () => {
     setDraggedOverLineIndex(null);
   };
-  
+
   const handleDragLeavePill = (e: React.DragEvent<HTMLDivElement>) => {
     e.stopPropagation();
     setDraggedOverPillInfo(null);
@@ -177,25 +186,15 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
   };
 
   const handleCheckSyntax = async () => {
-    const codeToVerify = expressionLines
-      .map(line => {
-        if (line.length === 0) return '';
-        const lineCode = line.map(p => p.label).join(' ');
-        if (line.length > 0 && (line[0]?.id === 'define' || (line[0]?.category === 'keyword' && line.length > 1))) {
-          return lineCode;
-        }
-        return `(${lineCode})`;
-      })
-      .filter(lineStr => lineStr.trim() !== '')
-      .join('\n');
+    const codeToVerify = generateRacketCode(expressionLines); // Use the imported function
 
     if (!codeToVerify.trim()) {
         toast({ title: "Empty Expression", description: "There's nothing to check.", variant: "default" });
         return;
     }
-      
+
     toast({ title: "Checking Syntax...", description: "Please wait." });
-    setErrorLineHighlight(null); 
+    setErrorLineHighlight(null);
     try {
       const result = await checkSyntaxAction(codeToVerify);
       if (result.isValid) {
@@ -288,7 +287,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
               onClick={() => removeLine(lineIndex)}
               className={cn(
                 "opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive",
-                expressionLines.length <=1 && "hidden" 
+                expressionLines.length <=1 && "hidden"
               )}
               title={`Remove line ${lineIndex + 1}`}
             >
