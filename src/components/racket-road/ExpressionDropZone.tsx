@@ -146,12 +146,12 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
           <PlusCircle className="mr-2 h-4 w-4" /> Add Line
         </Button>
       </div>
-      <CardContent className="flex-grow p-6 min-h-[200px] transition-colors duration-200 ease-in-out flex flex-col space-y-2">
+      <CardContent className="flex-grow p-6 transition-colors duration-200 ease-in-out flex flex-col space-y-2">
         {expressionLines.map((line, lineIndex) => (
           <div
             key={lineIndex}
             className={cn(
-              "p-2 h-14 border-2 border-dashed rounded-md transition-colors duration-200 ease-in-out flex items-center flex-wrap gap-2 overflow-x-auto",
+              "p-2 h-16 border-2 border-dashed rounded-md transition-colors duration-200 ease-in-out flex items-center flex-wrap gap-2 overflow-x-auto",
               draggedOverLineIndex === lineIndex ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/70'
             )}
             onDrop={(e) => handleDrop(e, lineIndex)}

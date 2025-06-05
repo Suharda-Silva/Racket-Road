@@ -1,3 +1,4 @@
+
 import { PILL_SPECS } from '@/config/pills';
 import type { PillSpec, PillCategory } from '@/types';
 import { Pill } from './Pill';
@@ -16,11 +17,10 @@ const CATEGORY_DISPLAY_NAMES: Record<PillCategory, string> = {
   operator: 'Operators',
   condition: 'Conditions & Predicates',
   variable: 'Variables',
-  number: 'Numbers',
-  string: 'Strings',
+  list_value: 'List Values',
 };
 
-const CATEGORY_ORDER: PillCategory[] = ['keyword', 'function', 'operator', 'condition', 'variable', 'number', 'string'];
+const CATEGORY_ORDER: PillCategory[] = ['keyword', 'function', 'operator', 'condition', 'variable', 'list_value'];
 
 
 export function PillPalette() {
@@ -49,7 +49,7 @@ export function PillPalette() {
                   {CATEGORY_DISPLAY_NAMES[category] || category.charAt(0).toUpperCase() + category.slice(1)}
                 </AccordionTrigger>
                 <AccordionContent className="pb-2 pl-2 pr-1 pt-1">
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {groupedPills[category].map((spec) => (
                       <Pill key={spec.id} pill={spec} isDraggable />
                     ))}

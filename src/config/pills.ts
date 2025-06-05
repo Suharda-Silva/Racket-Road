@@ -14,10 +14,10 @@ export const PILL_SPECS: PillSpec[] = [
   { 
     id: 'list', 
     label: 'list', 
-    category: 'keyword', // Changed from 'function'
+    category: 'keyword',
     color: 'bg-pill-keyword', 
     textColor: 'text-pill-keyword-foreground',
-    expects: ['variable', 'number', 'string'] // Guides (list item1 item2 item3...)
+    expects: ['list_value', 'list_value', 'list_value'] // Guides (list item1 item2 item3...) - general values
   },
 
   // Functions
@@ -27,7 +27,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'function', 
     color: 'bg-pill-function', 
     textColor: 'text-pill-function-foreground',
-    expects: ['variable', 'variable'] 
+    expects: ['list_value', 'variable'] // (cons item list)
   },
   { 
     id: 'first', 
@@ -67,14 +67,14 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'function', 
     color: 'bg-pill-function', 
     textColor: 'text-pill-function-foreground',
-    expects: ['function', 'variable', 'variable'] 
+    expects: ['function', 'list_value', 'variable'] // (foldr combiner initial-value list)
   },
 
   // Conditions
   { 
     id: 'empty?', 
     label: 'empty?', 
-    category: 'condition', // Changed from 'function'
+    category: 'condition',
     color: 'bg-pill-condition', 
     textColor: 'text-pill-condition-foreground',
     expects: ['variable'] 
@@ -85,7 +85,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'condition', 
     color: 'bg-pill-condition', 
     textColor: 'text-pill-condition-foreground',
-    expects: ['number'], 
+    expects: ['list_value'], // Expects a number, which is now a 'list_value'
     isTerminal: false, 
   },
   { 
@@ -94,7 +94,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'condition', 
     color: 'bg-pill-condition', 
     textColor: 'text-pill-condition-foreground',
-    expects: ['number'],
+    expects: ['list_value'], // Expects a number, which is now a 'list_value'
     isTerminal: false, 
   },
 
@@ -105,7 +105,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'operator', 
     color: 'bg-pill-operator', 
     textColor: 'text-pill-operator-foreground',
-    expects: ['number', 'number'] 
+    expects: ['list_value', 'list_value'] // Expects numbers
   },
   { 
     id: '-', 
@@ -113,7 +113,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'operator', 
     color: 'bg-pill-operator', 
     textColor: 'text-pill-operator-foreground',
-    expects: ['number', 'number'] 
+    expects: ['list_value', 'list_value'] // Expects numbers
   },
    { 
     id: '=', 
@@ -121,7 +121,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'operator', 
     color: 'bg-pill-operator', 
     textColor: 'text-pill-operator-foreground',
-    expects: ['number', 'number'] 
+    expects: ['list_value', 'list_value'] // Expects numbers or comparable values
   },
 
   // Variables
@@ -130,12 +130,9 @@ export const PILL_SPECS: PillSpec[] = [
   { id: 'acc', label: 'acc', category: 'variable', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
   { id: 'x', label: 'x', category: 'variable', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
 
-  // Strings
-  { id: 'str-hello', label: '"hello"', category: 'string', color: 'bg-pill-string', textColor: 'text-pill-string-foreground', isTerminal: true },
-  { id: 'str-empty', label: '""', category: 'string', color: 'bg-pill-string', textColor: 'text-pill-string-foreground', isTerminal: true },
-
-  // Numbers
-  { id: 'num-generic', label: '123', category: 'number', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
+  // List Values (merged Numbers and Strings)
+  { id: 'str-hello', label: '"hello"', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
+  { id: 'num-generic', label: '1 2 3', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
 ];
 
 // Helper to get pill color based on category for the dot indicator
@@ -148,8 +145,7 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     case 'condition': return 'bg-pill-condition';
     case 'operator': return 'bg-pill-operator';
     case 'variable': return 'bg-pill-variable';
-    case 'string': return 'bg-pill-string';
-    case 'number': return 'bg-pill-number';
+    case 'list_value': return 'bg-pill-variable'; // Using orange for list values
     default: return 'bg-muted opacity-50'; // Fallback for the dot
   }
 };
