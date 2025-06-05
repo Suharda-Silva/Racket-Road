@@ -25,7 +25,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'keyword',
     color: 'bg-pill-keyword',
     textColor: 'text-pill-keyword-foreground',
-    expects: ['list_value'] // Assuming display takes one argument
+    expects: ['list_value'] 
   },
 
   // Functions
@@ -154,8 +154,7 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     case 'condition': return 'bg-pill-condition';
     case 'operator': return 'bg-pill-operator';
     case 'variable': return 'bg-pill-variable';
-    case 'list_value': return 'bg-pill-variable';
+    case 'list_value': return 'bg-pill-variable'; // list_value pills often share variable styling
     default: return 'bg-muted opacity-50'; // Fallback for the dot
   }
 };
-
