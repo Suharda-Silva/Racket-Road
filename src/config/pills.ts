@@ -7,7 +7,7 @@ export const PILL_SPECS: PillSpec[] = [
     id: 'define',
     label: 'define',
     category: 'keyword',
-    color: 'bg-pill-keyword',
+    color: 'bg-pill-keyword', // Should be grey
     textColor: 'text-pill-keyword-foreground',
     expects: ['variable', 'list_value']
   },
@@ -15,7 +15,7 @@ export const PILL_SPECS: PillSpec[] = [
     id: 'list',
     label: 'list',
     category: 'keyword',
-    color: 'bg-pill-keyword',
+    color: 'bg-pill-keyword', // Should be grey
     textColor: 'text-pill-keyword-foreground',
     expects: ['list_value', 'list_value', 'list_value'] 
   },
@@ -23,7 +23,7 @@ export const PILL_SPECS: PillSpec[] = [
     id: 'display',
     label: 'display',
     category: 'keyword',
-    color: 'bg-pill-keyword',
+    color: 'bg-pill-keyword', // Should be grey
     textColor: 'text-pill-keyword-foreground',
     expects: ['list_value']
   },
