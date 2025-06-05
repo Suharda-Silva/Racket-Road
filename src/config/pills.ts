@@ -19,6 +19,14 @@ export const PILL_SPECS: PillSpec[] = [
     textColor: 'text-pill-keyword-foreground',
     expects: ['list_value', 'list_value', 'list_value']
   },
+  {
+    id: 'display',
+    label: 'display',
+    category: 'keyword',
+    color: 'bg-pill-keyword',
+    textColor: 'text-pill-keyword-foreground',
+    expects: ['list_value'] // Assuming display takes one argument
+  },
 
   // Functions
   {
@@ -129,6 +137,8 @@ export const PILL_SPECS: PillSpec[] = [
   { id: 'x', label: 'x', category: 'variable', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
 
   // List Values
+  { id: 'num-0', label: '0', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
+  { id: 'num-1', label: '1', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
   { id: 'str-hello', label: '"hello"', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
   { id: 'num-generic', label: '1 2 3', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
   { id: 'num-long-sequence', label: '1 2 3 4 5 6 7 8 9', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
@@ -148,3 +158,4 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     default: return 'bg-muted opacity-50'; // Fallback for the dot
   }
 };
+
