@@ -82,7 +82,8 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     return {
       isValid: false,
       message: `Syntax Error: Unmatched closing parenthesis on or before line ${globalErrorLineIndex + 1}. Check: ${originalLinesForContext[globalErrorLineIndex]}`,
-      errorLineIndex: globalErrorLineIndex
+      errorLineIndex: globalErrorLineIndex,
+      simulatedEvaluation: null
     };
   }
   if (globalParenBalance > 0) {
@@ -96,7 +97,8 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     return {
       isValid: false,
       message: `Syntax Error: Unmatched opening parenthesis. Possible issue around line ${lastOpenParenLine !== -1 ? lastOpenParenLine + 1 : lines.length}.`,
-      errorLineIndex: lastOpenParenLine !== -1 ? lastOpenParenLine : lines.length -1 
+      errorLineIndex: lastOpenParenLine !== -1 ? lastOpenParenLine : lines.length -1,
+      simulatedEvaluation: null
     };
   }
 
@@ -118,10 +120,10 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     }
     
     if (tokens[0] !== '(') {
-      return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to start with '('. Found: '${tokens[0]}...'`, errorLineIndex: i };
+      return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to start with '('. Found: '${tokens[0]}...'`, errorLineIndex: i, simulatedEvaluation: null };
     }
     if (tokens[tokens.length - 1] !== ')') {
-      return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to end with ')'. Line: ${originalLinesForContext[i]}`, errorLineIndex: i };
+      return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to end with ')'. Line: ${originalLinesForContext[i]}`, errorLineIndex: i, simulatedEvaluation: null };
     }
 
     const sExprTokens = tokens.slice(1, -1); 
@@ -133,8 +135,8 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const args = sExprTokens.slice(1);
 
     if (/^\d+(\.\d+)?$/.test(head) || (/^".*"$/.test(head) && head !== '""') ) {
-      if (sExprTokens.length > 1) {
-         return { isValid: false, message: `Syntax Error on line ${i + 1}: Operator/function expected. Found value '${head}' at the start of an expression.`, errorLineIndex: i };
+      if (sExprTokens.length > 1) { // Allow `("a string")` or `(123)` if they are the only thing in s-expr
+         return { isValid: false, message: `Syntax Error on line ${i + 1}: Operator/function expected. Found value '${head}' at the start of an expression.`, errorLineIndex: i, simulatedEvaluation: null };
       }
     }
     
@@ -146,55 +148,92 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
         
         if (head === 'define') {
           if (args.length < 1) { 
-            return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' needs at least a name and a value/body. Example: (define x 10).`, errorLineIndex: i };
+            return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' needs at least a name and a value/body. Example: (define x 10).`, errorLineIndex: i, simulatedEvaluation: null };
           }
           const varOrFuncName = args[0];
           if (varOrFuncName.startsWith('(') && varOrFuncName.endsWith(')')) { 
             const funcDefTokens = tokenize(varOrFuncName);
             if (funcDefTokens.length < 2 || funcDefTokens[0] !== '(' || funcDefTokens[funcDefTokens.length-1] !== ')') { 
-                 return { isValid: false, message: `Syntax Error on line ${i + 1}: Malformed function definition in 'define'. Expected (define (func-name args...) body).`, errorLineIndex: i };
+                 return { isValid: false, message: `Syntax Error on line ${i + 1}: Malformed function definition in 'define'. Expected (define (func-name args...) body).`, errorLineIndex: i, simulatedEvaluation: null };
             }
             if (args.length < 2) { 
-                 return { isValid: false, message: `Syntax Error on line ${i + 1}: Function definition in 'define' is missing a body.`, errorLineIndex: i };
+                 return { isValid: false, message: `Syntax Error on line ${i + 1}: Function definition in 'define' is missing a body.`, errorLineIndex: i, simulatedEvaluation: null };
             }
           } else { 
              if (args.length < 2) {
-                return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' expects a variable and a value. Example: (define x 10).`, errorLineIndex: i };
+                return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' expects a variable and a value. Example: (define x 10).`, errorLineIndex: i, simulatedEvaluation: null };
              }
              if (!/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(varOrFuncName) || /^\d/.test(varOrFuncName)) {
-                return { isValid: false, message: `Syntax Error on line ${i + 1}: Invalid variable name '${varOrFuncName}' in define.`, errorLineIndex: i };
+                return { isValid: false, message: `Syntax Error on line ${i + 1}: Invalid variable name '${varOrFuncName}' in define.`, errorLineIndex: i, simulatedEvaluation: null };
              }
           }
         } else if (head === 'list' || head === '+' || head === '-' || head === '=') {
-          if ((head === '+' || head === '-' || head === '=') && args.length === 0 && spec.expects.length > 0) {
-             // These can be called with zero arguments in some contexts, but our pills expect some by default.
-             // For strictness, one could enforce args.length >= 1 if spec.expects implies it.
-             // For now, this is a soft check.
-          }
+          // these functions can be variadic or handle zero args in some Racket contexts
         } else if (args.length < minExpectedArgs) {
-           return { isValid: false, message: `Syntax Error on line ${i + 1}: Not enough arguments for '${head}'. Expected ${minExpectedArgs}, got ${args.length}.`, errorLineIndex: i };
+           return { isValid: false, message: `Syntax Error on line ${i + 1}: Not enough arguments for '${head}'. Expected ${minExpectedArgs}, got ${args.length}.`, errorLineIndex: i, simulatedEvaluation: null };
         }
       }
     } else {
-      // Unknown function/operator. Could be user-defined. Heuristic check for symbol-like name.
-      if (!/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(head) && !head.startsWith("'") && head !== "...") {
-        // It's not a typical symbol. Could be an error or advanced Racket.
-        // For this tool, we might flag it if it's not a quoted list or a known construct.
-        // But for now, we'll be lenient on unknown heads if they look like symbols.
-      }
+      // Unknown function/operator. Could be user-defined.
     }
   }
   
-  // If all checks passed, determine simulated evaluation
-  const nonEmptyContentLines = originalLinesForContext.filter(line => line.trim() !== '');
-  let determinedSimulatedEvaluation: string | null;
+  // If all syntax checks passed, attempt specific pattern simulation
+  const nonEmptyTrimmedLines = originalLinesForContext.filter(line => line.trim() !== '').map(line => line.trim());
 
-  if (nonEmptyContentLines.length === 0) {
-    // This case is handled by the early return for empty code.
-    // If somehow reached, this is a fallback.
+  if (nonEmptyTrimmedLines.length === 2) {
+    const tokensLine1 = tokenize(nonEmptyTrimmedLines[0]);
+    const tokensLine2 = tokenize(nonEmptyTrimmedLines[1]);
+
+    let definedVarName: string | null = null;
+    let definedListElements: string[] | null = null;
+
+    // Check pattern: (define var (list e1 e2 ...))
+    // Example tokensLine1: ["(", "define", "x", "(", "list", "1", "2", "3", ")", ")"]
+    if (tokensLine1.length >= 7 && // Minimum for (define v (list))
+        tokensLine1[0] === '(' && tokensLine1[1] === 'define' &&
+        !tokensLine1[2].includes('(') && !tokensLine1[2].includes(')') && // var name is a symbol
+        tokensLine1[3] === '(' && tokensLine1[4] === 'list' &&
+        tokensLine1[tokensLine1.length - 2] === ')' && // inner list closing paren
+        tokensLine1[tokensLine1.length - 1] === ')') { // define closing paren
+      
+      definedVarName = tokensLine1[2];
+      // Elements are from index 5 up to length-2
+      definedListElements = tokensLine1.slice(5, tokensLine1.length - 2); 
+    }
+
+    if (definedVarName && definedListElements) {
+      // Check pattern: (filter even? definedVarName)
+      // Example tokensLine2: ["(", "filter", "even?", "x", ")"]
+      if (tokensLine2.length === 5 &&
+          tokensLine2[0] === '(' && tokensLine2[1] === 'filter' &&
+          tokensLine2[2] === 'even?' && tokensLine2[3] === definedVarName &&
+          tokensLine2[4] === ')') {
+
+        const numericElements = definedListElements
+          .map(el => parseInt(el, 10))
+          .filter(n => !isNaN(n)); // ensure they are numbers
+
+        const filteredList = numericElements.filter(num => num % 2 === 0);
+        
+        const simulatedResult = filteredList.length > 0 ? `'(${filteredList.join(' ')})` : "'()";
+        
+        return {
+          isValid: true,
+          message: "AI Check: Syntax appears plausible. Specific multi-line pattern evaluated.",
+          simulatedEvaluation: simulatedResult,
+          errorLineIndex: null
+        };
+      }
+    }
+  }
+
+  // Fallback simulation for other valid cases
+  let determinedSimulatedEvaluation: string | null;
+  if (nonEmptyTrimmedLines.length === 0) {
     determinedSimulatedEvaluation = "// Expression is empty";
-  } else if (nonEmptyContentLines.length === 1) {
-    const singleLineTrimmed = nonEmptyContentLines[0].trim();
+  } else if (nonEmptyTrimmedLines.length === 1) {
+    const singleLineTrimmed = nonEmptyTrimmedLines[0];
     if (singleLineTrimmed === "(+ 1 2)") {
       determinedSimulatedEvaluation = "3";
     } else if (singleLineTrimmed === "(list 1 2 3)") {
@@ -204,21 +243,24 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     } else if (singleLineTrimmed.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)) {
       const match = singleLineTrimmed.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/);
       determinedSimulatedEvaluation = `// ${match?.[1]} defined`;
-    } else if (/^\([\w?!+\-*\/<>=.]+(\s+[\w".?!+\-*\/<>=]+)*\)$/.test(singleLineTrimmed)) { // any other s-expr
+    } else if (/^\([\w?!+\-*\/<>=.]+(\s+[\w".?!+\-*\/<>=()']+)*\)$/.test(singleLineTrimmed) || 
+               /^'.*$/.test(singleLineTrimmed) || // quoted expressions
+               /^#['()]/.test(singleLineTrimmed)) { // reader macros like #'( ... )
       determinedSimulatedEvaluation = "Value from expression. (Simulated)";
     } else if (!singleLineTrimmed.includes('(') && !singleLineTrimmed.includes(')') && singleLineTrimmed.length > 0) { // atom
-      determinedSimulatedEvaluation = singleLineTrimmed; // Echo atom
+      determinedSimulatedEvaluation = singleLineTrimmed; 
     } else {
-      // For example, if the line is just '()' or something that passed validation but isn't a typical expression.
       determinedSimulatedEvaluation = "Expression valid. (Simulated output)";
     }
-  } else { // Multiple non-empty lines
+  } else { 
     determinedSimulatedEvaluation = "Final result of evaluation. (Simulated)";
   }
 
   return { 
     isValid: true, 
     message: "AI Check: Syntax appears plausible (enhanced heuristics).", 
-    simulatedEvaluation: determinedSimulatedEvaluation 
+    simulatedEvaluation: determinedSimulatedEvaluation,
+    errorLineIndex: null 
   };
 }
+
