@@ -9,18 +9,18 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'keyword', 
     color: 'bg-pill-keyword', 
     textColor: 'text-pill-keyword-foreground',
-    expects: ['variable', 'function'] // Simplified: (define var val) or (define (func args) body)
+    expects: ['variable', 'variable'] // Simplified: (define varName valueOrExpressionStart)
   },
-
-  // Functions
   { 
     id: 'list', 
     label: 'list', 
-    category: 'function', 
-    color: 'bg-pill-function', 
-    textColor: 'text-pill-function-foreground',
-    expects: ['number', 'string', 'variable'] 
+    category: 'keyword', // Changed from 'function'
+    color: 'bg-pill-keyword', 
+    textColor: 'text-pill-keyword-foreground',
+    expects: ['variable', 'number', 'string'] // Guides (list item1 item2 item3...)
   },
+
+  // Functions
   { 
     id: 'cons', 
     label: 'cons', 
@@ -40,14 +40,6 @@ export const PILL_SPECS: PillSpec[] = [
   { 
     id: 'rest', 
     label: 'rest', 
-    category: 'function', 
-    color: 'bg-pill-function', 
-    textColor: 'text-pill-function-foreground',
-    expects: ['variable'] 
-  },
-  { 
-    id: 'empty?', 
-    label: 'empty?', 
     category: 'function', 
     color: 'bg-pill-function', 
     textColor: 'text-pill-function-foreground',
@@ -79,6 +71,14 @@ export const PILL_SPECS: PillSpec[] = [
   },
 
   // Conditions
+  { 
+    id: 'empty?', 
+    label: 'empty?', 
+    category: 'condition', // Changed from 'function'
+    color: 'bg-pill-condition', 
+    textColor: 'text-pill-condition-foreground',
+    expects: ['variable'] 
+  },
   { 
     id: 'even?', 
     label: 'even?', 
@@ -135,9 +135,7 @@ export const PILL_SPECS: PillSpec[] = [
   { id: 'str-empty', label: '""', category: 'string', color: 'bg-pill-string', textColor: 'text-pill-string-foreground', isTerminal: true },
 
   // Numbers
-  { id: 'num-1', label: '1', category: 'number', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
-  { id: 'num-2', label: '2', category: 'number', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
-  { id: 'num-0', label: '0', category: 'number', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
+  { id: 'num-generic', label: '123', category: 'number', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
 ];
 
 // Helper to get pill color based on category for the dot indicator
