@@ -35,6 +35,7 @@ export function PillPalette() {
   }, {} as Record<PillCategory, PillSpec[]>);
 
   const orderedCategories = CATEGORY_ORDER.filter(cat => groupedPills[cat] && groupedPills[cat].length > 0);
+  const defaultOpenCategories = ['keyword', 'function'];
 
   return (
     <Card className="h-full flex flex-col shadow-xl">
@@ -43,7 +44,7 @@ export function PillPalette() {
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden p-2">
         <ScrollArea className="h-full pr-2">
-          <Accordion type="multiple" defaultValue={orderedCategories} className="w-full">
+          <Accordion type="multiple" defaultValue={defaultOpenCategories} className="w-full">
             {orderedCategories.map((category) => (
               <AccordionItem value={category} key={category}>
                 <AccordionTrigger className="text-sm font-semibold hover:no-underline px-2 py-2">
