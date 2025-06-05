@@ -233,12 +233,12 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange, o
 
   return (
     <Card className="h-full flex flex-col shadow-xl">
-      <CardHeader className="p-4 border-b flex justify-between items-center">
-        <div>
+      <CardHeader className="p-4 border-b flex items-center">
+        <div className="flex-grow">
           <CardTitle className="font-headline text-lg">Expression Builder</CardTitle>
           <CardDescription className="text-sm">Drag pills here to build your Racket expressions.</CardDescription>
         </div>
-        <Button variant="ghost" size="sm" onClick={addLine} title="Add new line">
+        <Button variant="ghost" size="sm" onClick={addLine} title="Add new line" className="ml-auto shrink-0">
           <PlusCircle className="mr-2 h-4 w-4" /> Add Line
         </Button>
       </CardHeader>
