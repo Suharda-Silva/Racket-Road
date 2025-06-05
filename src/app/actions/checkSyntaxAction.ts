@@ -3,6 +3,7 @@
 
 import type { PillSpec } from '@/types';
 import { PILL_SPECS } from '@/config/pills';
+import { evaluateRacket } from '@/ai/flows/evaluate-racket-flow';
 
 interface SyntaxCheckResult {
   isValid: boolean;
@@ -15,7 +16,6 @@ const findPillSpecByLabel = (label: string): PillSpec | undefined => {
   return PILL_SPECS.find(spec => spec.label === label);
 };
 
-// Basic tokenizer: splits by space, handles strings, keeps parens as separate tokens.
 function tokenize(line: string): string[] {
     const tokens: string[] = [];
     let currentToken = "";
@@ -26,7 +26,7 @@ function tokenize(line: string): string[] {
         if (char === '"') {
             inString = !inString;
             currentToken += char;
-            if (!inString || i === line.length - 1) { // End of string or end of line
+            if (!inString || i === line.length - 1) { 
                 if (currentToken) tokens.push(currentToken);
                 currentToken = "";
             }
@@ -55,8 +55,6 @@ function tokenize(line: string): string[] {
 
 
 export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult> {
-  await new Promise(resolve => setTimeout(resolve, 300)); 
-
   const lines = code.split('\n');
   const originalLinesForContext = code.split('\n');
 
@@ -135,7 +133,7 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const args = sExprTokens.slice(1);
 
     if (/^\d+(\.\d+)?$/.test(head) || (/^".*"$/.test(head) && head !== '""') ) {
-      if (sExprTokens.length > 1) { // Allow `("a string")` or `(123)` if they are the only thing in s-expr
+      if (sExprTokens.length > 1) { 
          return { isValid: false, message: `Syntax Error on line ${i + 1}: Operator/function expected. Found value '${head}' at the start of an expression.`, errorLineIndex: i, simulatedEvaluation: null };
       }
     }
@@ -168,99 +166,45 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
              }
           }
         } else if (head === 'list' || head === '+' || head === '-' || head === '=') {
-          // these functions can be variadic or handle zero args in some Racket contexts
+          // Variadic or zero-arg handling
         } else if (args.length < minExpectedArgs) {
            return { isValid: false, message: `Syntax Error on line ${i + 1}: Not enough arguments for '${head}'. Expected ${minExpectedArgs}, got ${args.length}.`, errorLineIndex: i, simulatedEvaluation: null };
         }
       }
-    } else {
-      // Unknown function/operator. Could be user-defined.
     }
   }
   
-  // If all syntax checks passed, attempt specific pattern simulation
-  const nonEmptyTrimmedLines = originalLinesForContext.filter(line => line.trim() !== '').map(line => line.trim());
-
-  if (nonEmptyTrimmedLines.length === 2) {
-    const tokensLine1 = tokenize(nonEmptyTrimmedLines[0]);
-    const tokensLine2 = tokenize(nonEmptyTrimmedLines[1]);
-
-    let definedVarName: string | null = null;
-    let definedListElements: string[] | null = null;
-
-    // Check pattern: (define var (list e1 e2 ...))
-    // Example tokensLine1: ["(", "define", "x", "(", "list", "1", "2", "3", ")", ")"]
-    if (tokensLine1.length >= 7 && // Minimum for (define v (list))
-        tokensLine1[0] === '(' && tokensLine1[1] === 'define' &&
-        !tokensLine1[2].includes('(') && !tokensLine1[2].includes(')') && // var name is a symbol
-        tokensLine1[3] === '(' && tokensLine1[4] === 'list' &&
-        tokensLine1[tokensLine1.length - 2] === ')' && // inner list closing paren
-        tokensLine1[tokensLine1.length - 1] === ')') { // define closing paren
-      
-      definedVarName = tokensLine1[2];
-      // Elements are from index 5 up to length-2
-      definedListElements = tokensLine1.slice(5, tokensLine1.length - 2); 
-    }
-
-    if (definedVarName && definedListElements) {
-      // Check pattern: (filter even? definedVarName)
-      // Example tokensLine2: ["(", "filter", "even?", "x", ")"]
-      if (tokensLine2.length === 5 &&
-          tokensLine2[0] === '(' && tokensLine2[1] === 'filter' &&
-          tokensLine2[2] === 'even?' && tokensLine2[3] === definedVarName &&
-          tokensLine2[4] === ')') {
-
-        const numericElements = definedListElements
-          .map(el => parseInt(el, 10))
-          .filter(n => !isNaN(n)); // ensure they are numbers
-
-        const filteredList = numericElements.filter(num => num % 2 === 0);
-        
-        const simulatedResult = filteredList.length > 0 ? `'(${filteredList.join(' ')})` : "'()";
-        
-        return {
-          isValid: true,
-          message: "AI Check: Syntax appears plausible. Specific multi-line pattern evaluated.",
-          simulatedEvaluation: simulatedResult,
-          errorLineIndex: null
-        };
-      }
-    }
-  }
-
-  // Fallback simulation for other valid cases
-  let determinedSimulatedEvaluation: string | null;
-  if (nonEmptyTrimmedLines.length === 0) {
-    determinedSimulatedEvaluation = "// Expression is empty";
-  } else if (nonEmptyTrimmedLines.length === 1) {
-    const singleLineTrimmed = nonEmptyTrimmedLines[0];
-    if (singleLineTrimmed === "(+ 1 2)") {
-      determinedSimulatedEvaluation = "3";
-    } else if (singleLineTrimmed === "(list 1 2 3)") {
-      determinedSimulatedEvaluation = "'(1 2 3)";
-    } else if (singleLineTrimmed === "(define x 10)") {
-      determinedSimulatedEvaluation = "// x defined";
-    } else if (singleLineTrimmed.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)) {
-      const match = singleLineTrimmed.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/);
-      determinedSimulatedEvaluation = `// ${match?.[1]} defined`;
-    } else if (/^\([\w?!+\-*\/<>=.]+(\s+[\w".?!+\-*\/<>=()']+)*\)$/.test(singleLineTrimmed) || 
-               /^'.*$/.test(singleLineTrimmed) || // quoted expressions
-               /^#['()]/.test(singleLineTrimmed)) { // reader macros like #'( ... )
-      determinedSimulatedEvaluation = "Value from expression. (Simulated)";
-    } else if (!singleLineTrimmed.includes('(') && !singleLineTrimmed.includes(')') && singleLineTrimmed.length > 0) { // atom
-      determinedSimulatedEvaluation = singleLineTrimmed; 
+  // If all local syntax checks passed, proceed to AI evaluation
+  try {
+    const aiResponse = await evaluateRacket({ racketCode: code });
+    
+    // The AI might still say the syntax is bad (evaluationSuccess: false) even if local checks pass.
+    // We can use AI's success flag to potentially override local `isValid`, or just use its message.
+    // For now, let's prioritize AI's evaluation for the `simulatedEvaluation` string.
+    // If AI reports an evaluation error, it's often more insightful than a generic "syntax plausible".
+    
+    let finalMessage = "Syntax appears plausible.";
+    if (aiResponse.evaluationSuccess) {
+        finalMessage = "AI Check: Code evaluated successfully.";
     } else {
-      determinedSimulatedEvaluation = "Expression valid. (Simulated output)";
+        // If AI says evaluation failed, it's likely an evaluation error or a more subtle syntax error.
+        finalMessage = `AI Check: ${aiResponse.evaluationResult}`; // Show AI's error/reason.
     }
-  } else { 
-    determinedSimulatedEvaluation = "Final result of evaluation. (Simulated)";
+
+    return { 
+      isValid: aiResponse.evaluationSuccess, // Let AI's success dictate overall validity for now
+      message: finalMessage, 
+      simulatedEvaluation: aiResponse.evaluationResult,
+      errorLineIndex: null // AI doesn't reliably give line numbers for evaluation errors
+    };
+
+  } catch (e) {
+    console.error("Error calling AI evaluation flow:", e);
+    return {
+      isValid: false, // Indicate failure if AI call itself fails
+      message: "AI Evaluation Error: Could not get simulated output. Syntax might still be plausible based on local checks.",
+      simulatedEvaluation: "// AI evaluation service failed.",
+      errorLineIndex: null
+    };
   }
-
-  return { 
-    isValid: true, 
-    message: "AI Check: Syntax appears plausible (enhanced heuristics).", 
-    simulatedEvaluation: determinedSimulatedEvaluation,
-    errorLineIndex: null 
-  };
 }
-
