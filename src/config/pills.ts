@@ -2,7 +2,7 @@
 import type { PillSpec, PillCategory } from '@/types';
 
 export const PILL_SPECS: PillSpec[] = [
-  // Keywords
+  // Keywords (Grey)
   {
     id: 'define',
     label: 'define',
@@ -28,7 +28,7 @@ export const PILL_SPECS: PillSpec[] = [
     expects: ['list_value']
   },
 
-  // Functions
+  // Functions (Purple)
   {
     id: 'cons',
     label: 'cons',
@@ -78,7 +78,7 @@ export const PILL_SPECS: PillSpec[] = [
     expects: ['function', 'list_value', 'variable']
   },
 
-  // Conditions
+  // Conditions (Blue)
   {
     id: 'empty?',
     label: 'empty?',
@@ -106,7 +106,7 @@ export const PILL_SPECS: PillSpec[] = [
     isTerminal: false,
   },
 
-  // Operators
+  // Operators (Blue)
   {
     id: '+',
     label: '+',
@@ -132,16 +132,18 @@ export const PILL_SPECS: PillSpec[] = [
     expects: ['list_value', 'list_value']
   },
 
-  // Variables
+  // Variables (Orange)
   { id: 'item', label: 'item', category: 'variable', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
   { id: 'x', label: 'x', category: 'variable', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
 
-  // List Values (Numbers, Strings)
+  // List Values
+  // Numbers (Orange)
   { id: 'num-0', label: '0', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
   { id: 'num-1', label: '1', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
-  { id: 'str-hello', label: '"hello"', category: 'list_value', color: 'bg-pill-string', textColor: 'text-pill-string-foreground', isTerminal: true },
   { id: 'num-generic', label: '1 2 3', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
   { id: 'num-long-sequence', label: '1 2 3 4 5 6 7 8 9', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
+  // Strings (Green)
+  { id: 'str-hello', label: '"hello"', category: 'list_value', color: 'bg-pill-string', textColor: 'text-pill-string-foreground', isTerminal: true },
 ];
 
 // Helper to get pill color based on category for the dot indicator
@@ -153,10 +155,10 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     case 'condition': return 'bg-pill-condition';
     case 'operator': return 'bg-pill-operator';
     case 'variable': return 'bg-pill-variable';
-    case 'list_value': // For list_value, the dot might indicate a generic placeholder.
-                       // Specific number/string pills will use their own colors.
-                       // For the dot, we can use a general color, or one of the specific ones if a more precise type is known.
-                       // Using variable/number color as a general 'value' indicator.
+    case 'list_value':
+      // For the dot, 'list_value' can represent numbers or strings.
+      // We'll default to the number color as a general 'value' indicator.
+      // Specific pills will use their explicit colors.
       return 'bg-pill-number'; 
     default: return 'bg-muted opacity-50'; 
   }
