@@ -1,6 +1,7 @@
+
 'use client';
 
-import type { PillSpec, PillCategory } from '@/types';
+import type { PillSpec } from '@/types';
 import { cn } from '@/lib/utils';
 import { GripVertical } from 'lucide-react';
 
@@ -56,17 +57,16 @@ export function Pill({
   );
 }
 
-export function PillPlaceholder({ category, dotColor }: { category?: PillCategory | null, dotColor?: string }) {
-  const label = category ? `${category}` : 'Drop Here';
+export function PillPlaceholder({ dotColor }: { dotColor?: string }) {
   return (
-    <div 
-      className={cn(
-        "flex items-center justify-center px-4 py-2 rounded-full shadow-inner border-2 border-dashed text-sm",
-        dotColor ? `${dotColor} opacity-50 text-white` : "border-muted text-muted-foreground opacity-70",
-        "min-w-[80px]"
-      )}
-    >
-      <span>{label}</span>
+    <div className="flex items-center justify-center h-full w-full" aria-hidden="true">
+      <span
+        className={cn(
+          'w-3 h-3 rounded-full', // Standard dot size
+          dotColor || 'bg-muted opacity-50',
+          'shadow-sm'
+        )}
+      ></span>
     </div>
   );
 }

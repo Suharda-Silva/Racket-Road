@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { PlacedPill, PillSpec, PillCategory } from '@/types';
@@ -15,56 +16,41 @@ import { useToast } from '@/hooks/use-toast';
 // This is a simplified version. A more robust solution would involve a proper parser or state machine.
 const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | null => {
   if (currentSequence.length === 0) {
-    return 'function'; // Typically, Racket expressions start with a function
+    return 'keyword'; // Allow 'define' or a function to start
   }
 
   const lastPill = currentSequence[currentSequence.length - 1];
   
-  if (lastPill.expects && lastPill.expects.length > 0) {
-    // How many args of lastPill's type have been provided *after* it in the sequence?
-    let providedArgsCount = 0;
-    let tempSequence = [...currentSequence];
-    tempSequence.pop(); // Remove lastPill itself
-
-    // This logic is still too simple, as it doesn't understand nesting or argument boundaries.
-    // For now, let's assume 'expects' defines a flat sequence of arguments.
-    // A more robust approach would track the "active function" and its filled arguments.
-    
-    // Simplified: find first pill that looks like it belongs to lastPill
-    let i = currentSequence.length - 2;
-    while(i >= 0) {
-      const prevPill = currentSequence[i];
-      // This is a naive check. Does not really understand scope.
-      if (lastPill.expects.includes(prevPill.category)) {
-         providedArgsCount++;
-      } else if (prevPill.category === 'function') { // Stop if we hit another function
-        break;
+  // Simplified: Iteratively find the most recent function/keyword that might still expect arguments.
+  // This is a basic heuristic and doesn't fully parse nested structures.
+  for (let i = currentSequence.length - 1; i >= 0; i--) {
+    const potentialFn = currentSequence[i];
+    if ((potentialFn.category === 'function' || potentialFn.category === 'keyword' || potentialFn.category === 'operator') && potentialFn.expects) {
+      // Count arguments provided *after* this potentialFn in the sequence up to the end.
+      // This simple count assumes arguments are flat and immediately follow.
+      const argsProvidedCount = currentSequence.length - 1 - i;
+      
+      if (argsProvidedCount < potentialFn.expects.length) {
+        return potentialFn.expects[argsProvidedCount];
       }
-      i--;
-    }
-    
-    // A very basic heuristic for demonstration
-    const currentArgIndex = currentSequence.filter(p => p.category !== 'function' && p.category !== 'operator').length % lastPill.expects.length;
-
-
-    if (currentArgIndex < lastPill.expects.length) {
-       return lastPill.expects[currentArgIndex];
+      // If this function's args are filled, it's no longer the "active" one for next expectation.
+      // The loop will continue to check earlier functions/keywords.
     }
   }
-
-  // If the last pill is terminal or its expectations are met,
-  // we might expect another function or an operator to continue/combine expressions.
-  if (lastPill.isTerminal) return null; // Or 'operator' if we want to chain like (+ 1 2)
   
-  // Default fallback, or if previous function's args are filled
-  return 'variable'; // Could be more intelligent
+  // If the last pill itself is terminal and no unfulfilled function was found before it.
+  if (lastPill.isTerminal) return null; 
+
+  // Default: if no specific function context is found or the last function is satisfied,
+  // expect a new top-level expression (e.g., another function or keyword).
+  return 'keyword'; 
 };
 
 
 export function ExpressionDropZone() {
   const [expression, setExpression] = useState<PlacedPill[]>([]);
   const [draggedOver, setDraggedOver] = useState(false);
-  const [nextExpected, setNextExpected] = useState<PillCategory | null>('function');
+  const [nextExpected, setNextExpected] = useState<PillCategory | null>('keyword');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -82,7 +68,6 @@ export function ExpressionDropZone() {
         instanceId: `${pillSpec.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       };
       setExpression((prev) => [...prev, newPlacedPill]);
-      // Trigger a "pop" animation on the drop zone or last pill
       const dropZoneElement = e.currentTarget;
       dropZoneElement.classList.add('animate-pop');
       setTimeout(() => dropZoneElement.classList.remove('animate-pop'), 300);
@@ -90,7 +75,7 @@ export function ExpressionDropZone() {
   }, []);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Necessary to allow dropping
+    e.preventDefault(); 
     e.dataTransfer.dropEffect = 'move';
     setDraggedOver(true);
   };
@@ -104,7 +89,7 @@ export function ExpressionDropZone() {
   };
 
   const handleCheckSyntax = async () => {
-    const codeToVerify = expression.map(p => p.label).join(' '); // Simplified representation
+    const codeToVerify = expression.map(p => p.label).join(' '); 
     toast({ title: "Checking Syntax...", description: "Please wait." });
     try {
       const result = await checkSyntaxAction(codeToVerify);
@@ -130,7 +115,7 @@ export function ExpressionDropZone() {
       </div>
       <CardContent
         className={cn(
-          "flex-grow p-6  min-h-[200px] transition-colors duration-200 ease-in-out",
+          "flex-grow p-6 min-h-[200px] transition-colors duration-200 ease-in-out flex items-start", // Added flex items-start
           draggedOver ? 'bg-accent/10' : ''
         )}
         onDrop={handleDrop}
@@ -139,9 +124,7 @@ export function ExpressionDropZone() {
         aria-label="Expression drop zone"
       >
         {expression.length === 0 && !draggedOver && (
-           <div className="flex items-center justify-center h-full">
-             <PillPlaceholder category={nextExpected} dotColor={getPillCategoryColor(nextExpected)} />
-           </div>
+           nextExpected ? <PillPlaceholder dotColor={getPillCategoryColor(nextExpected)} /> : <div className="flex items-center justify-center h-full w-full text-muted-foreground">Drop pills here</div>
         )}
 
         <div className="flex flex-wrap gap-2 items-center">
@@ -155,9 +138,6 @@ export function ExpressionDropZone() {
               dotColor={getPillCategoryColor(nextExpected)}
             />
           ))}
-          {expression.length > 0 && nextExpected && !draggedOver && (
-             <PillPlaceholder category={nextExpected} dotColor={getPillCategoryColor(nextExpected)} />
-          )}
         </div>
 
       </CardContent>
