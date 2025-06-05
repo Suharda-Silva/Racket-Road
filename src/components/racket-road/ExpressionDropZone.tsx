@@ -19,7 +19,7 @@ interface ExpressionDropZoneProps {
 
 const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | null => {
   if (currentSequence.length === 0) {
-    return 'keyword'; 
+    return 'keyword';
   }
 
   for (let i = currentSequence.length - 1; i >= 0; i--) {
@@ -30,7 +30,7 @@ const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | 
         return potentialFn.expects[argsProvidedCount];
       }
       if (argsProvidedCount >= potentialFn.expects.length) {
-        break; 
+        break;
       }
     }
   }
@@ -66,18 +66,17 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
 
   const handleDropOnLine = useCallback((e: React.DragEvent<HTMLDivElement>, targetLineIdx: number) => {
     e.preventDefault();
+    const currentTargetElement = e.currentTarget; // Capture the element
     setDraggedOverLineIndex(null);
     resetErrorHighlight();
     const newLines = [...expressionLines];
 
     if (e.dataTransfer.types.includes('application/racket-placed-pill')) {
       const { lineIndex: sourceLineIdx, pillIndex: sourcePillIdx, instanceId: draggedInstanceId } = JSON.parse(e.dataTransfer.getData('application/racket-placed-pill'));
-      const draggedPill = newLines[sourceLineIdx].find(p => p.instanceId === draggedInstanceId);
+      const draggedPill = newLines[sourceLineIdx]?.find(p => p.instanceId === draggedInstanceId);
 
       if (draggedPill) {
-        // Remove from source
         newLines[sourceLineIdx] = newLines[sourceLineIdx].filter(p => p.instanceId !== draggedInstanceId);
-        // Add to end of target line
         newLines[targetLineIdx] = [...newLines[targetLineIdx], draggedPill];
         onExpressionLinesChange(newLines);
       }
@@ -90,14 +89,20 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       };
       newLines[targetLineIdx] = [...newLines[targetLineIdx], newPlacedPill];
       onExpressionLinesChange(newLines);
-      e.currentTarget.classList.add('animate-pop');
-      setTimeout(() => e.currentTarget.classList.remove('animate-pop'), 300);
+      if (currentTargetElement) {
+        currentTargetElement.classList.add('animate-pop');
+        setTimeout(() => {
+          if (currentTargetElement) {
+            currentTargetElement.classList.remove('animate-pop');
+          }
+        }, 300);
+      }
     }
   }, [expressionLines, onExpressionLinesChange]);
 
   const handleDropOnPill = useCallback((e: React.DragEvent<HTMLDivElement>, targetLineIdx: number, targetPillIdx: number) => {
     e.preventDefault();
-    e.stopPropagation(); // Important to prevent event bubbling to line's onDrop
+    e.stopPropagation(); 
     setDraggedOverPillInfo(null);
     resetErrorHighlight();
     const newLines = [...expressionLines];
@@ -105,22 +110,18 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
     if (e.dataTransfer.types.includes('application/racket-placed-pill')) {
       const { lineIndex: sourceLineIdx, pillIndex: sourcePillIdx, instanceId: draggedInstanceId } = JSON.parse(e.dataTransfer.getData('application/racket-placed-pill'));
       
-      // Avoid dropping on itself - though this check might be redundant if handled by not allowing drop on source
       if (sourceLineIdx === targetLineIdx && sourcePillIdx === targetPillIdx) return;
 
-      const draggedPill = newLines[sourceLineIdx].find(p => p.instanceId === draggedInstanceId);
+      const draggedPill = newLines[sourceLineIdx]?.find(p => p.instanceId === draggedInstanceId);
 
       if (draggedPill) {
-        // Remove from source
         newLines[sourceLineIdx] = newLines[sourceLineIdx].filter(p => p.instanceId !== draggedInstanceId);
         
-        // Adjust targetPillIndex if source was in the same line and before target, due to removal
         let adjustedTargetPillIdx = targetPillIdx;
         if (sourceLineIdx === targetLineIdx && sourcePillIdx < targetPillIdx) {
           adjustedTargetPillIdx--;
         }
 
-        // Insert before target pill in target line
         newLines[targetLineIdx] = [
           ...newLines[targetLineIdx].slice(0, adjustedTargetPillIdx),
           draggedPill,
@@ -135,7 +136,6 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
         ...pillSpec,
         instanceId: `${pillSpec.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       };
-      // Insert before target pill
       newLines[targetLineIdx] = [
         ...newLines[targetLineIdx].slice(0, targetPillIdx),
         newPlacedPill,
@@ -150,7 +150,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDraggedOverLineIndex(lineIndex);
-    setDraggedOverPillInfo(null); // Clear pill highlight if dragging over line
+    setDraggedOverPillInfo(null); 
   };
 
   const handleDragOverPill = (e: React.DragEvent<HTMLDivElement>, lineIndex: number, pillIndex: number) => {
@@ -158,7 +158,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setDraggedOverPillInfo({ lineIndex, pillIndex });
-    setDraggedOverLineIndex(lineIndex); // Also highlight the line
+    setDraggedOverLineIndex(lineIndex); 
   };
 
   const handleDragLeaveLine = () => {
@@ -168,9 +168,6 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
   const handleDragLeavePill = (e: React.DragEvent<HTMLDivElement>) => {
     e.stopPropagation();
     setDraggedOverPillInfo(null);
-    // If leaving a pill but still over the line, keep line highlighted
-    // If relatedTarget is not part of the line, then clear line highlight. This is tricky.
-    // For simplicity, pill drag leave might not clear line highlight if it's still over the line.
   };
 
 
