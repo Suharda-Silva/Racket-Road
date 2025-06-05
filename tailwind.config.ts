@@ -66,17 +66,21 @@ export default {
           ring: 'hsl(var(--sidebar-ring))',
         },
         pill: {
+          keyword: {
+            DEFAULT: 'hsl(var(--pill-keyword-bg))',
+            foreground: 'hsl(var(--pill-keyword-fg))',
+          },
           function: {
             DEFAULT: 'hsl(var(--pill-function-bg))',
             foreground: 'hsl(var(--pill-function-fg))',
           },
-          condition: {
-            DEFAULT: 'hsl(var(--pill-condition-bg))',
-            foreground: 'hsl(var(--pill-condition-fg))',
-          },
           operator: {
             DEFAULT: 'hsl(var(--pill-operator-bg))',
             foreground: 'hsl(var(--pill-operator-fg))',
+          },
+          condition: {
+            DEFAULT: 'hsl(var(--pill-condition-bg))',
+            foreground: 'hsl(var(--pill-condition-fg))',
           },
           variable: {
             DEFAULT: 'hsl(var(--pill-variable-bg))',
@@ -90,10 +94,6 @@ export default {
             DEFAULT: 'hsl(var(--pill-number-bg))',
             foreground: 'hsl(var(--pill-number-fg))',
           },
-          keyword: {
-            DEFAULT: 'hsl(var(--pill-keyword-bg))',
-            foreground: 'hsl(var(--pill-keyword-fg))',
-          }
         }
       },
       borderRadius: {

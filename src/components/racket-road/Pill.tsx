@@ -8,11 +8,10 @@ import { GripVertical } from 'lucide-react';
 interface PillProps {
   pill: PillSpec;
   showDot?: boolean;
-  dotColor?: string; // Tailwind bg color class for the dot
+  dotColor?: string; 
   onClick?: () => void;
   className?: string;
-  isGhost?: boolean; // For displaying in drop zone not yet filled
-  // Standard HTML drag props
+  isGhost?: boolean; 
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -39,7 +38,9 @@ export function Pill({
 }: PillProps) {
   const baseClasses = "flex items-center justify-between px-4 py-2 rounded-full shadow-md transition-all duration-150 ease-in-out";
   const interactiveClasses = draggable ? "cursor-grab active:cursor-grabbing hover:shadow-lg" : (onClick ? "cursor-pointer hover:shadow-lg" : "");
-  const ghostClasses = isGhost ? "border-2 border-dashed opacity-70" : pill.color;
+  // The background color is applied here using pill.color.
+  // If isGhost is true, different styling is applied.
+  const backgroundOrGhostClasses = isGhost ? "border-2 border-dashed opacity-70 border-muted-foreground" : pill.color;
   
   return (
     <div
@@ -52,9 +53,9 @@ export function Pill({
       onClick={onClick}
       className={cn(
         baseClasses,
-        pill.textColor,
+        pill.textColor, // Applies text color, e.g., text-pill-function-foreground
         interactiveClasses,
-        ghostClasses,
+        backgroundOrGhostClasses, // Applies background color, e.g., bg-pill-function or ghost styles
         className
       )}
       aria-label={`${pill.label} pill, type ${pill.category}`}
@@ -73,7 +74,7 @@ export function PillPlaceholder({ dotColor }: { dotColor?: string }) {
     <div className="flex items-center justify-center h-full w-full" aria-hidden="true">
       <span
         className={cn(
-          'w-3 h-3 rounded-full', // Standard dot size
+          'w-3 h-3 rounded-full', 
           dotColor || 'bg-muted opacity-50',
           'shadow-sm'
         )}
@@ -81,4 +82,3 @@ export function PillPlaceholder({ dotColor }: { dotColor?: string }) {
     </div>
   );
 }
-
