@@ -17,7 +17,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'keyword',
     color: 'bg-pill-keyword',
     textColor: 'text-pill-keyword-foreground',
-    expects: ['list_value', 'list_value', 'list_value']
+    expects: ['list_value', 'list_value', 'list_value'] // Example, can be variadic
   },
   {
     id: 'display',
@@ -25,7 +25,7 @@ export const PILL_SPECS: PillSpec[] = [
     category: 'keyword',
     color: 'bg-pill-keyword',
     textColor: 'text-pill-keyword-foreground',
-    expects: ['list_value'] 
+    expects: ['list_value']
   },
 
   // Functions
@@ -137,11 +137,12 @@ export const PILL_SPECS: PillSpec[] = [
   { id: 'x', label: 'x', category: 'variable', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
 
   // List Values
-  { id: 'num-0', label: '0', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
-  { id: 'num-1', label: '1', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
-  { id: 'str-hello', label: '"hello"', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
-  { id: 'num-generic', label: '1 2 3', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
-  { id: 'num-long-sequence', label: '1 2 3 4 5 6 7 8 9', category: 'list_value', color: 'bg-pill-variable', textColor: 'text-pill-variable-foreground', isTerminal: true },
+  { id: 'num-0', label: '0', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
+  { id: 'num-1', label: '1', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
+  { id: 'str-hello', label: '"hello"', category: 'list_value', color: 'bg-pill-string', textColor: 'text-pill-string-foreground', isTerminal: true },
+  // Generic list values might still use variable colors or a specific 'list_value' color if defined
+  { id: 'num-generic', label: '1 2 3', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
+  { id: 'num-long-sequence', label: '1 2 3 4 5 6 7 8 9', category: 'list_value', color: 'bg-pill-number', textColor: 'text-pill-number-foreground', isTerminal: true },
 ];
 
 // Helper to get pill color based on category for the dot indicator
@@ -154,7 +155,9 @@ export const getPillCategoryColor = (category: PillCategory | null): string => {
     case 'condition': return 'bg-pill-condition';
     case 'operator': return 'bg-pill-operator';
     case 'variable': return 'bg-pill-variable';
-    case 'list_value': return 'bg-pill-variable'; // list_value pills often share variable styling
+    case 'list_value': return 'bg-pill-variable'; // This is a general fallback for list_value type if not more specific
+                                                // For actual string/number pills, their specific colors from PILL_SPECS will be used.
+                                                // This dot might indicate 'any list value' type.
     default: return 'bg-muted opacity-50'; // Fallback for the dot
   }
 };
