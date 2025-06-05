@@ -1,49 +1,60 @@
+
 'use server';
 
 interface SyntaxCheckResult {
   isValid: boolean;
   message: string;
-  // In a real scenario, this might include suggestions or error locations
+  errorLineIndex?: number | null; // Index of the line with the error
 }
 
 // This is a placeholder for an actual AI syntax check.
 // It uses very basic heuristics.
 export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult> {
   // Simulate AI processing delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, 500));
 
-  const trimmedCode = code.trim();
-
-  if (!trimmedCode) {
+  const lines = code.split('\n');
+  if (lines.every(line => line.trim() === '')) {
     return { isValid: true, message: "Expression is empty." };
   }
 
-  // Basic parenthesis check (very naive)
-  let balance = 0;
-  for (const char of trimmedCode) {
-    if (char === '(') balance++;
-    if (char === ')') balance--;
-    if (balance < 0) return { isValid: false, message: "Syntax Error: Unmatched closing parenthesis." };
-  }
-  // This check is disabled as pills don't form parentheses yet.
-  // if (balance !== 0) return { isValid: false, message: "Syntax Error: Unmatched opening parenthesis." };
+  for (let i = 0; i < lines.length; i++) {
+    const lineCode = lines[i].trim();
+    if (lineCode === '' || lineCode === '()') continue; // Skip empty or effectively empty lines
 
-  // Check for common Racket keywords/functions
-  const knownFunctions = ['list', 'cons', 'filter', 'map', 'foldr', '+', '-', '=', 'even?', 'odd?', 'empty?'];
-  const parts = trimmedCode.split(/\s+/);
-  
-  if (parts.length > 0) {
-    const firstPart = parts[0].replace('(', ''); // Naive way to handle potential opening paren
-    if (!knownFunctions.includes(firstPart) && !/^\d+$/.test(firstPart) && !/^".*"$/.test(firstPart) && !/^[a-zA-Z\-]+$/.test(firstPart)) {
-       // If it's not a known function, number, string, or simple variable name
-       // return { isValid: false, message: `Syntax Error: Unknown start of expression '${firstPart}'.` };
+    // Basic parenthesis check for this line
+    let balance = 0;
+    for (const char of lineCode) {
+      if (char === '(') balance++;
+      if (char === ')') balance--;
+      if (balance < 0) return { isValid: false, message: `Syntax Error on line ${i + 1}: Unmatched closing parenthesis.`, errorLineIndex: i };
+    }
+    // Only check for unmatched opening if the line isn't clearly incomplete (e.g. just an opening paren and a function)
+    // This check is tricky without more context on how pills form the line
+    // if (balance !== 0 && lineCode.endsWith(')')) {
+    //   return { isValid: false, message: `Syntax Error on line ${i + 1}: Unmatched opening parenthesis.`, errorLineIndex: i };
+    // }
+
+    const parts = lineCode.replace(/^\(|\)$/g, '').trim().split(/\s+/); // Remove outer parens for part analysis
+    
+    if (parts.length > 0 && parts[0] !== '') {
+      const firstPart = parts[0];
+      const knownFunctions = ['list', 'cons', 'filter', 'map', 'foldr', '+', '-', '=', 'even?', 'odd?', 'empty?', 'define'];
+      
+      // If the line starts with something that isn't a known function/keyword and isn't a clear value
+      if (!knownFunctions.includes(firstPart) &&
+          !/^\d+$/.test(firstPart) && // number
+          !/^".*"$/.test(firstPart) && // string
+          !/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=]*$/.test(firstPart) // variable/symbol
+      ) {
+        // This check can be noisy, disabling for now as pill structure implies valid starts.
+        // return { isValid: false, message: `Syntax Error on line ${i + 1}: Unknown start of expression '${firstPart}'.`, errorLineIndex: i };
+      }
+    } else if (lineCode !== '()' && lineCode !== '') { // Line has content but parsing to parts failed (e.g. just "( " )
+        // return { isValid: false, message: `Syntax Error on line ${i + 1}: Incomplete or malformed expression.`, errorLineIndex: i };
     }
   }
   
-  // Simulate a positive result if basic checks pass
-  if (trimmedCode.length > 2 ) { // Arbitrary length check for some content
-    return { isValid: true, message: "AI Check: Looks like valid Racket (basic check)." };
-  } else {
-    return { isValid: false, message: "AI Check: Expression is too short or seems incomplete." };
-  }
+  // If all lines pass basic checks
+  return { isValid: true, message: "AI Check: Looks plausible (basic multi-line check)." };
 }

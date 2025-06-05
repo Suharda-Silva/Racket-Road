@@ -14,18 +14,31 @@ export function LiveCodeView({ expressionLines }: LiveCodeViewProps) {
     return lines
       .map(line => {
         if (line.length === 0) {
-          return '';
+          return ''; // Skip empty lines
         }
-        // A simple heuristic: if the first pill is 'define' or another keyword that starts a top-level form,
-        // it might not need outer parens for that line itself.
-        // Other expressions (function calls, operations) usually are wrapped.
+        
         const lineCode = line.map(pill => pill.label).join(' ');
-        if (line[0]?.id === 'define' || (line[0]?.category === 'keyword' && line.length > 1) ) {
+
+        // Heuristic for outer parentheses:
+        // - If it starts with 'define', it's likely a top-level form like (define x 10)
+        // - If it starts with a keyword that typically forms a block (like 'list', 'cond', 'lambda' - though we don't have all yet),
+        //   and has multiple elements, it's also likely a self-contained S-expression.
+        // - Otherwise, wrap it in parentheses.
+        const firstPill = line[0];
+        if (firstPill?.id === 'define' || 
+            (firstPill?.category === 'keyword' && line.length > 1) ) { // e.g. (list 1 2 3)
             return lineCode;
         }
+        
+        // Avoid wrapping already parenthesized user input, if they typed it like that
+        // (This is a basic check and might not cover all cases of user-typed parens)
+        if (lineCode.startsWith('(') && lineCode.endsWith(')')) {
+            return lineCode;
+        }
+
         return `(${lineCode})`;
       })
-      .filter(lineStr => lineStr.trim() !== '')
+      .filter(lineStr => lineStr.trim() !== '' && lineStr.trim() !== '()') // Filter out completely empty or "()" lines
       .join('\n');
   };
 

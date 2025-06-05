@@ -5,10 +5,10 @@ import type { PlacedPill, PillSpec, PillCategory } from '@/types';
 import { useState, useCallback, useEffect } from 'react';
 import { Pill, PillPlaceholder } from './Pill';
 import { Button } from '@/components/ui/button';
-import { Trash2, Sparkles, PlusCircle } from 'lucide-react';
+import { Trash2, Sparkles, PlusCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPillCategoryColor } from '@/config/pills';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { checkSyntaxAction } from '@/app/actions/checkSyntaxAction';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,7 +21,6 @@ const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | 
   if (currentSequence.length === 0) {
     return 'keyword'; // Expect a keyword like 'define' or a function to start an S-expression
   }
-  const lastPill = currentSequence[currentSequence.length - 1];
 
   // Traverse backwards to find the most recent function/operator/keyword that expects arguments
   for (let i = currentSequence.length - 1; i >= 0; i--) {
@@ -31,22 +30,14 @@ const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | 
       if (argsProvidedCount < potentialFn.expects.length) {
         return potentialFn.expects[argsProvidedCount];
       }
-      // If all expected args for this function are provided, it might be the end, or it's nested.
-      // For simplicity here, if all args are met, we assume it could be followed by another keyword/fn for a new top-level expression,
-      // or it's terminal if the function itself is terminal.
       if (argsProvidedCount >= potentialFn.expects.length) {
-        break; // Stop looking further back for this line
+        break; 
       }
     }
   }
-  // If the last pill is terminal (like a number or variable not part of a function call yet),
-  // then nothing is expected *after* it in its current context.
-  // The expression might be complete, or it needs to be part of a larger S-expression.
+  const lastPill = currentSequence[currentSequence.length - 1];
   if (lastPill.isTerminal) return null;
 
-  // Default fallback if no specific function is guiding, or if a function's args are filled
-  // This could mean we are ready for a new top-level expression or the expression is done.
-  // Returning null indicates no specific next pill is strictly expected by current syntax.
   return null;
 };
 
@@ -54,15 +45,23 @@ const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | 
 export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }: ExpressionDropZoneProps) {
   const [draggedOverLineIndex, setDraggedOverLineIndex] = useState<number | null>(null);
   const [nextExpectedPerLine, setNextExpectedPerLine] = useState<(PillCategory | null)[]>([]);
+  const [errorLineHighlight, setErrorLineHighlight] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     setNextExpectedPerLine(expressionLines.map(line => getNextExpectedCategory(line)));
   }, [expressionLines]);
 
+  const resetErrorHighlight = () => {
+    if (errorLineHighlight !== null) {
+      setErrorLineHighlight(null);
+    }
+  };
+
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>, lineIndex: number) => {
     e.preventDefault();
     setDraggedOverLineIndex(null);
+    resetErrorHighlight();
     const pillSpecJSON = e.dataTransfer.getData('application/racket-pill');
     if (pillSpecJSON) {
       const pillSpec: PillSpec = JSON.parse(pillSpecJSON);
@@ -76,10 +75,11 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       onExpressionLinesChange(newLines);
       
       const dropZoneElement = e.currentTarget;
+      dropZoneElement.classList.remove('border-destructive'); // Clear error border on drop
       dropZoneElement.classList.add('animate-pop');
       setTimeout(() => dropZoneElement.classList.remove('animate-pop'), 300);
     }
-  }, [expressionLines, onExpressionLinesChange]);
+  }, [expressionLines, onExpressionLinesChange, errorLineHighlight]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, lineIndex: number) => {
     e.preventDefault();
@@ -93,6 +93,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
 
   const handleClearExpression = () => {
     onExpressionLinesChange(expressionLines.map(() => []));
+    resetErrorHighlight();
   };
 
   const handleCheckSyntax = async () => {
@@ -100,8 +101,11 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       .map(line => {
         if (line.length === 0) return '';
         const lineCode = line.map(p => p.label).join(' ');
-        // Heuristic: if not 'define', wrap in parens for syntax check
-        return (line[0]?.id === 'define' || line[0]?.category === 'keyword' && line.length > 1) ? lineCode : `(${lineCode})`;
+        // Wrap in parens for syntax check if not 'define' or similar keyword
+        if (line.length > 0 && (line[0]?.id === 'define' || (line[0]?.category === 'keyword' && line.length > 1))) {
+          return lineCode;
+        }
+        return `(${lineCode})`;
       })
       .filter(lineStr => lineStr.trim() !== '')
       .join('\n');
@@ -112,12 +116,16 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
     }
       
     toast({ title: "Checking Syntax...", description: "Please wait." });
+    setErrorLineHighlight(null); // Clear previous error highlights
     try {
       const result = await checkSyntaxAction(codeToVerify);
       if (result.isValid) {
         toast({ title: "Syntax OK!", description: result.message, variant: "default" });
       } else {
-        toast({ title: "Syntax Error", description: result.message, variant: "destructive" });
+        toast({ title: "Syntax Issue", description: result.message, variant: "destructive" });
+        if (result.errorLineIndex !== undefined && result.errorLineIndex !== null) {
+          setErrorLineHighlight(result.errorLineIndex);
+        }
       }
     } catch (error) {
       toast({ title: "Error", description: "Could not check syntax.", variant: "destructive" });
@@ -129,15 +137,27 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       idx === lineIndex ? line.filter(p => p.instanceId !== instanceId) : line
     );
     onExpressionLinesChange(newLines);
+    resetErrorHighlight();
   };
 
   const addLine = () => {
     onExpressionLinesChange([...expressionLines, []]);
+    resetErrorHighlight();
+  };
+
+  const removeLine = (lineIndex: number) => {
+    if (expressionLines.length <= 1) {
+      toast({ title: "Cannot Remove", description: "You must have at least one line.", variant: "default" });
+      return;
+    }
+    const newLines = expressionLines.filter((_, idx) => idx !== lineIndex);
+    onExpressionLinesChange(newLines);
+    resetErrorHighlight();
   };
 
   return (
     <Card className="h-full flex flex-col shadow-xl">
-      <div className="p-4 border-b border-border flex justify-between items-center">
+      <CardHeader className="p-4 border-b border-border flex justify-between items-center">
         <div>
           <h2 className="text-lg font-headline">Expression Builder</h2>
           <p className="text-sm text-muted-foreground">Drag pills here to build your Racket expressions.</p>
@@ -145,33 +165,47 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
         <Button variant="ghost" size="sm" onClick={addLine} title="Add new line">
           <PlusCircle className="mr-2 h-4 w-4" /> Add Line
         </Button>
-      </div>
+      </CardHeader>
       <CardContent className="flex-grow p-6 transition-colors duration-200 ease-in-out flex flex-col space-y-2">
         {expressionLines.map((line, lineIndex) => (
-          <div
-            key={lineIndex}
-            className={cn(
-              "p-2 h-16 border-2 border-dashed rounded-md transition-colors duration-200 ease-in-out flex items-center flex-wrap gap-2 overflow-x-auto",
-              draggedOverLineIndex === lineIndex ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/70'
-            )}
-            onDrop={(e) => handleDrop(e, lineIndex)}
-            onDragOver={(e) => handleDragOver(e, lineIndex)}
-            onDragLeave={handleDragLeave}
-            aria-label={`Expression line ${lineIndex + 1}`}
-          >
-            {line.length === 0 && draggedOverLineIndex !== lineIndex && (
-              nextExpectedPerLine[lineIndex] ? <PillPlaceholder dotColor={getPillCategoryColor(nextExpectedPerLine[lineIndex])} /> : <div className="text-muted-foreground text-xs pl-1">Drop pills here...</div>
-            )}
-            {line.map((pill, pillIndex) => (
-              <Pill
-                key={pill.instanceId}
-                pill={pill}
-                className="animate-pop shrink-0"
-                onClick={() => removePill(lineIndex, pill.instanceId)}
-                showDot={pillIndex === line.length - 1 && !!nextExpectedPerLine[lineIndex] && !pill.isTerminal}
-                dotColor={getPillCategoryColor(nextExpectedPerLine[lineIndex])}
-              />
-            ))}
+          <div key={lineIndex} className="flex items-center space-x-2 group">
+            <div
+              className={cn(
+                "flex-grow p-2 h-16 border-2 border-dashed rounded-md transition-all duration-200 ease-in-out flex items-center flex-wrap gap-2 overflow-x-auto",
+                draggedOverLineIndex === lineIndex ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/70',
+                errorLineHighlight === lineIndex && 'border-destructive ring-2 ring-destructive'
+              )}
+              onDrop={(e) => handleDrop(e, lineIndex)}
+              onDragOver={(e) => handleDragOver(e, lineIndex)}
+              onDragLeave={handleDragLeave}
+              aria-label={`Expression line ${lineIndex + 1}`}
+            >
+              {line.length === 0 && draggedOverLineIndex !== lineIndex && (
+                nextExpectedPerLine[lineIndex] ? <PillPlaceholder dotColor={getPillCategoryColor(nextExpectedPerLine[lineIndex])} /> : <div className="text-muted-foreground text-xs pl-1">Drop pills here...</div>
+              )}
+              {line.map((pill, pillIndex) => (
+                <Pill
+                  key={pill.instanceId}
+                  pill={pill}
+                  className="animate-pop shrink-0"
+                  onClick={() => removePill(lineIndex, pill.instanceId)}
+                  showDot={pillIndex === line.length - 1 && !!nextExpectedPerLine[lineIndex] && !pill.isTerminal}
+                  dotColor={getPillCategoryColor(nextExpectedPerLine[lineIndex])}
+                />
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => removeLine(lineIndex)}
+              className={cn(
+                "opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive",
+                expressionLines.length <=1 && "hidden" // Hide if only one line
+              )}
+              title={`Remove line ${lineIndex + 1}`}
+            >
+              <XCircle className="h-5 w-5" />
+            </Button>
           </div>
         ))}
       </CardContent>
