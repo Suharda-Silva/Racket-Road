@@ -65,6 +65,32 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        pill: {
+          function: {
+            DEFAULT: 'hsl(var(--pill-function-bg))',
+            foreground: 'hsl(var(--pill-function-fg))',
+          },
+          condition: {
+            DEFAULT: 'hsl(var(--pill-condition-bg))',
+            foreground: 'hsl(var(--pill-condition-fg))',
+          },
+          operator: {
+            DEFAULT: 'hsl(var(--pill-operator-bg))',
+            foreground: 'hsl(var(--pill-operator-fg))',
+          },
+          variable: {
+            DEFAULT: 'hsl(var(--pill-variable-bg))',
+            foreground: 'hsl(var(--pill-variable-fg))',
+          },
+          string: {
+            DEFAULT: 'hsl(var(--pill-string-bg))',
+            foreground: 'hsl(var(--pill-string-fg))',
+          },
+          number: {
+            DEFAULT: 'hsl(var(--pill-number-bg))',
+            foreground: 'hsl(var(--pill-number-fg))',
+          },
+        }
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -88,10 +114,15 @@ export default {
             height: '0',
           },
         },
+        pop: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.05)' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'pop': 'pop 0.3s ease-out',
       },
     },
   },
