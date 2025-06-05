@@ -55,6 +55,9 @@ Example Scenarios:
 
 Provide ONLY the JSON output.
 `,
+  config: {
+    safetySettings: [{category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE'}]
+  }
 });
 
 const evaluateRacketFlow = ai.defineFlow(
@@ -63,17 +66,28 @@ const evaluateRacketFlow = ai.defineFlow(
     inputSchema: EvaluateRacketInputSchema,
     outputSchema: EvaluateRacketOutputSchema,
   },
-  async (input: EvaluateRacketInput) => {
+  async (input: EvaluateRacketInput): Promise<EvaluateRacketOutput> => {
     if (!input.racketCode.trim()) {
       return { evaluationResult: "// Expression is empty", evaluationSuccess: true };
     }
-    // Potentially adjust safety settings if needed, but start with defaults.
-    // config: { safetySettings: [{category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE'}] }
-    const {output} = await racketEvaluationPrompt(input);
     
-    if (!output) {
-        return { evaluationResult: "// AI evaluation did not produce a structured output.", evaluationSuccess: false };
+    try {
+      const {output} = await racketEvaluationPrompt(input);
+      
+      if (!output) {
+          // This case handles if the LLM returns nothing or something not parsable into the schema,
+          // but the prompt call itself didn't throw an error.
+          return { evaluationResult: "// AI evaluation did not produce a structured output.", evaluationSuccess: false };
+      }
+      return output; // output should conform to EvaluateRacketOutputSchema
+    } catch (error) {
+      // This catch block handles errors thrown by the racketEvaluationPrompt call itself (e.g. API errors, Genkit errors)
+      console.error("Error during racketEvaluationPrompt execution:", error);
+      return { 
+        evaluationResult: "// Error calling AI model for evaluation.", 
+        evaluationSuccess: false 
+      };
     }
-    return output;
   }
 );
+
