@@ -90,6 +90,10 @@ export default {
             DEFAULT: 'hsl(var(--pill-number-bg))',
             foreground: 'hsl(var(--pill-number-fg))',
           },
+          keyword: {
+            DEFAULT: 'hsl(var(--pill-keyword-bg))',
+            foreground: 'hsl(var(--pill-keyword-fg))',
+          }
         }
       },
       borderRadius: {

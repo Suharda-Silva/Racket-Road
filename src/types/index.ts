@@ -1,4 +1,4 @@
-export type PillCategory = 'function' | 'condition' | 'operator' | 'variable' | 'string' | 'number';
+export type PillCategory = 'function' | 'condition' | 'operator' | 'variable' | 'string' | 'number' | 'keyword';
 
 export interface PillSpec {
   id: string; // Unique identifier for the spec, e.g., "filter", "num-1"

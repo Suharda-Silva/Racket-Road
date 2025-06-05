@@ -40,16 +40,18 @@ body {
     /* Custom Pill Colors */
     --pill-function-bg: var(--primary);
     --pill-function-fg: var(--primary-foreground);
-    --pill-condition-bg: 210 90% 50%; /* Blue */
-    --pill-condition-fg: 0 0% 100%;   /* White */
-    --pill-operator-bg: 210 90% 50%; /* Blue */
-    --pill-operator-fg: 0 0% 100%;   /* White */
-    --pill-variable-bg: 33 100% 50%;  /* Orange */
-    --pill-variable-fg: 0 0% 10%;    /* Dark text */
-    --pill-string-bg: 130 60% 40%;   /* Green */
-    --pill-string-fg: 0 0% 100%;    /* White */
-    --pill-number-bg: 33 100% 50%;   /* Orange */
-    --pill-number-fg: 0 0% 10%;     /* Dark text */
+    --pill-condition-bg: hsl(210 90% 50%); /* Blue */
+    --pill-condition-fg: hsl(0 0% 100%);   /* White */
+    --pill-operator-bg: hsl(210 90% 50%); /* Blue */
+    --pill-operator-fg: hsl(0 0% 100%);   /* White */
+    --pill-variable-bg: hsl(33 100% 50%);  /* Orange */
+    --pill-variable-fg: hsl(0 0% 10%);    /* Dark text */
+    --pill-string-bg: hsl(130 60% 40%);   /* Green */
+    --pill-string-fg: hsl(0 0% 100%);    /* White */
+    --pill-number-bg: hsl(33 100% 50%);   /* Orange */
+    --pill-number-fg: hsl(0 0% 10%);     /* Dark text */
+    --pill-keyword-bg: var(--muted); /* Greyish from muted */
+    --pill-keyword-fg: var(--muted-foreground);
     
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -99,16 +101,18 @@ body {
     /* Custom Pill Colors Dark */
     --pill-function-bg: var(--primary);
     --pill-function-fg: var(--primary-foreground);
-    --pill-condition-bg: 210 90% 60%;
-    --pill-condition-fg: 0 0% 10%;
-    --pill-operator-bg: 210 90% 60%;
-    --pill-operator-fg: 0 0% 10%;
-    --pill-variable-bg: 33 100% 60%;
-    --pill-variable-fg: 0 0% 10%;
-    --pill-string-bg: 130 60% 50%;
-    --pill-string-fg: 0 0% 10%;
-    --pill-number-bg: 33 100% 60%;
-    --pill-number-fg: 0 0% 10%;
+    --pill-condition-bg: hsl(210 90% 60%);
+    --pill-condition-fg: hsl(0 0% 10%);
+    --pill-operator-bg: hsl(210 90% 60%);
+    --pill-operator-fg: hsl(0 0% 10%);
+    --pill-variable-bg: hsl(33 100% 60%);
+    --pill-variable-fg: hsl(0 0% 10%);
+    --pill-string-bg: hsl(130 60% 50%);
+    --pill-string-fg: hsl(0 0% 10%);
+    --pill-number-bg: hsl(33 100% 60%);
+    --pill-number-fg: hsl(0 0% 10%);
+    --pill-keyword-bg: var(--muted);
+    --pill-keyword-fg: var(--muted-foreground);
 
     --sidebar-background: 271 30% 18%;
     --sidebar-foreground: 267 100% 92%;
