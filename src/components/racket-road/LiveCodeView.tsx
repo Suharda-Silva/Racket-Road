@@ -18,38 +18,54 @@ export const generateRacketCode = (lines: PlacedPill[][]): string => {
         return '';
       }
 
-      const lineCode = line.map(pill => pill.label).join(' ');
-
+      // Case 1: Single pill on the line
       if (line.length === 1) {
-          const pill = line[0];
-          if (pill.category === 'variable' || pill.category === 'list_value' ||
-             (pill.category === 'keyword' && (pill.label === '#t' || pill.label === '#f'))) { // #t and #f are self-evaluating
-              return lineCode;
-          }
+        const pill = line[0];
+        // Check if it's a self-evaluating atom or a variable name that doesn't need wrapping.
+        if (pill.category === 'variable' || 
+            pill.category === 'list_value' || 
+            (pill.category === 'keyword' && (pill.label === '#t' || pill.label === '#f'))) {
+          return pill.label;
+        }
+        // Otherwise, a single function/operator/keyword pill (like 'list' by itself) should be wrapped if it's meant to be called.
+        return `(${pill.label})`;
+      }
+
+      // Case 2: Multiple pills on the line, forming an S-expression.
+      const firstPill = line[0];
+
+      // Handle (define var (list elements...)) specifically
+      if (firstPill.label === 'define' && line.length >= 3 && line[2].label === 'list') {
+        const varName = line[1].label;
+        const listKeyword = line[2].label;
+        const listElements = line.slice(3).map(p => p.label).join(' ');
+        const listExpr = `(${listKeyword}${listElements ? ' ' + listElements : ''})`;
+        return `(${firstPill.label} ${varName} ${listExpr})`;
       }
       
-      if (lineCode.startsWith('(') && lineCode.endsWith(')')) {
-          let balance = 0;
-          let validSExpr = true;
-          for (let i = 0; i < lineCode.length; i++) {
-              if (lineCode[i] === '(') balance++;
-              else if (lineCode[i] === ')') balance--;
-              if (balance < 0) {
-                  validSExpr = false;
-                  break;
-              }
-              if (balance === 0 && i < lineCode.length - 1 && lineCode.substring(i+1).trim() !== "") {
-                  validSExpr = false; // Multiple top-level s-expressions on one line, not typical for this tool's line-by-line generation
-                  break;
-              }
-          }
-          if (balance === 0 && validSExpr) return lineCode;
+      // Handle (define var <value_expression>) or (define var <simple_value>)
+      if (firstPill.label === 'define' && line.length >= 2) { // Need at least define and var
+        const varName = line[1].label;
+        if (line.length === 2) { // (define x) - incomplete, but represent as is for syntax checker
+             return `(${firstPill.label} ${varName})`;
+        }
+        const valuePills = line.slice(2);
+        if (valuePills.length === 1) { 
+          // (define x 10) or (define x "foo") or (define x someVar)
+          return `(${firstPill.label} ${varName} ${valuePills[0].label})`;
+        } else { 
+          // (define x (+ 1 2))
+          const valueExpr = `(${valuePills.map(p => p.label).join(' ')})`;
+          return `(${firstPill.label} ${varName} ${valueExpr})`;
+        }
       }
 
-      // Most constructed lines will need wrapping
-      return `(${lineCode})`;
+      // Default case for other S-expressions (filter even? x), (+ 1 2), etc.
+      const allLabels = line.map(pill => pill.label).join(' ');
+      return `(${allLabels})`;
     })
-    .filter(lineStr => lineStr.trim() !== '' && lineStr.trim() !== '()')
+    .filter(lineStr => lineStr.trim() !== '') // Remove empty lines
+    //.filter(lineStr => lineStr.trim() !== '()') // Allow empty list () if generated intentionally
     .join('\n');
 };
 
