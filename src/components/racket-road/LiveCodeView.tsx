@@ -4,9 +4,11 @@
 import type { PlacedPill } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 interface LiveCodeViewProps {
   expressionLines: PlacedPill[][];
+  evaluationResult: string | null;
 }
 
 export const generateRacketCode = (lines: PlacedPill[][]): string => {
@@ -18,18 +20,14 @@ export const generateRacketCode = (lines: PlacedPill[][]): string => {
 
       const lineCode = line.map(pill => pill.label).join(' ');
 
-      // If it's a single pill that's a variable, a number, or a string literal.
-      // These are considered "atoms" and don't need outer parentheses.
       if (line.length === 1) {
           const pill = line[0];
-          if (pill.category === 'variable' ||
-              (pill.category === 'list_value' &&
-               (/^\d+(\s\d+)*$/.test(pill.label) || /^".*"$/.test(pill.label) || pill.label === '#t' || pill.label === '#f'))) {
+          if (pill.category === 'variable' || pill.category === 'list_value' ||
+             (pill.category === 'keyword' && (pill.label === '#t' || pill.label === '#f'))) { // #t and #f are self-evaluating
               return lineCode;
           }
       }
-
-      // If the user has already typed something that looks like a fully formed S-expression
+      
       if (lineCode.startsWith('(') && lineCode.endsWith(')')) {
           let balance = 0;
           let validSExpr = true;
@@ -41,28 +39,21 @@ export const generateRacketCode = (lines: PlacedPill[][]): string => {
                   break;
               }
               if (balance === 0 && i < lineCode.length - 1 && lineCode.substring(i+1).trim() !== "") {
-                  validSExpr = false;
+                  validSExpr = false; // Multiple top-level s-expressions on one line, not typical for this tool's line-by-line generation
                   break;
               }
           }
           if (balance === 0 && validSExpr) return lineCode;
       }
 
-      // Default: wrap with parentheses to form an S-expression.
-      // This includes `define` forms, e.g., (define x 10)
-      // but also simple function calls (which might be what users build initially)
-      if (line.length > 0 && (line[0]?.id === 'define' || (line[0]?.category === 'keyword' && line.length > 1) || line[0]?.category === 'function' || line[0]?.category === 'operator' || line[0]?.category === 'condition')) {
-         return `(${lineCode})`;
-      }
-      // If it's not a known form that starts an s-expression, and not an atom, it might be malformed or an incomplete list
-      // For now, we'll wrap it to be cautious, but the syntax checker should catch issues.
+      // Most constructed lines will need wrapping
       return `(${lineCode})`;
     })
     .filter(lineStr => lineStr.trim() !== '' && lineStr.trim() !== '()')
     .join('\n');
 };
 
-export function LiveCodeView({ expressionLines }: LiveCodeViewProps) {
+export function LiveCodeView({ expressionLines, evaluationResult }: LiveCodeViewProps) {
   const racketCode = generateRacketCode(expressionLines);
 
   return (
@@ -76,6 +67,19 @@ export function LiveCodeView({ expressionLines }: LiveCodeViewProps) {
             {racketCode || "// Drag pills to the expression builder above to see code here"}
           </pre>
         </ScrollArea>
+        {evaluationResult !== null && (
+          <>
+            <Separator className="my-4" />
+            <div>
+              <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Evaluation Result (Simulated):</h3>
+              <div className="rounded-md border bg-muted/20 p-3 shadow-inner">
+                <pre className="text-sm font-code text-foreground whitespace-pre-wrap">
+                  {evaluationResult}
+                </pre>
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

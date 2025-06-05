@@ -10,10 +10,11 @@ import { RacketRoadLogo } from '@/components/racket-road/RacketRoadLogo';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { HelpCircle } from 'lucide-react';
 
-const INITIAL_LINES = 1; // Start with one line
+const INITIAL_LINES = 1; 
 
 export default function RacketRoadPage() {
   const [expressionLines, setExpressionLines] = useState<PlacedPill[][]>(() => Array(INITIAL_LINES).fill(null).map(() => []));
+  const [evaluationResultForDisplay, setEvaluationResultForDisplay] = useState<string | null>(null);
 
   const howToPlayItems = [
     <>Drag pills from the <strong className="text-primary">Pill Palette</strong> on the left.</>,
@@ -67,8 +68,12 @@ export default function RacketRoadPage() {
             <ExpressionDropZone
               expressionLines={expressionLines}
               onExpressionLinesChange={setExpressionLines}
+              onEvaluationResultChange={setEvaluationResultForDisplay}
             />
-            <LiveCodeView expressionLines={expressionLines} />
+            <LiveCodeView 
+              expressionLines={expressionLines}
+              evaluationResult={evaluationResultForDisplay}
+            />
           </div>
         </div>
       </main>

@@ -10,17 +10,18 @@ import { cn } from '@/lib/utils';
 import { getPillCategoryColor } from '@/config/pills';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { checkSyntaxAction } from '@/app/actions/checkSyntaxAction';
-import { generateRacketCode } from './LiveCodeView'; // Import the function
+import { generateRacketCode } from './LiveCodeView'; 
 import { useToast } from '@/hooks/use-toast';
 
 interface ExpressionDropZoneProps {
   expressionLines: PlacedPill[][];
   onExpressionLinesChange: (lines: PlacedPill[][]) => void;
+  onEvaluationResultChange: (result: string | null) => void;
 }
 
 const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | null => {
   if (currentSequence.length === 0) {
-    return 'keyword'; // Typically, a Racket line might start with a keyword or function
+    return 'keyword'; 
   }
 
   for (let i = currentSequence.length - 1; i >= 0; i--) {
@@ -30,27 +31,19 @@ const getNextExpectedCategory = (currentSequence: PlacedPill[]): PillCategory | 
       if (argsProvidedCount < potentialFn.expects.length) {
         return potentialFn.expects[argsProvidedCount];
       }
-      // If all expected args for this function are provided, we might be done with this s-expression part.
-      // Or it could be a variadic function. For simplicity, if all defined 'expects' are met,
-      // we consider it complete for *this* function, and won't suggest another argument for it.
-      // Further pills would either start a new expression or be an error (handled by syntax check)
       if (argsProvidedCount >= potentialFn.expects.length) {
-        break; // Stop looking for expects from this function
+        break; 
       }
     }
   }
-  // If the last pill is terminal (like a variable or literal value not expecting more)
   const lastPill = currentSequence[currentSequence.length - 1];
   if (lastPill.isTerminal) return null;
 
-  // Default: if no specific expectation is derived, don't show a dot.
-  // Or, one could argue to expect 'list_value' if inside a list, or another 'function' etc.
-  // For now, keeping it null means the dot only shows when a function/operator explicitly expects something.
   return null;
 };
 
 
-export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }: ExpressionDropZoneProps) {
+export function ExpressionDropZone({ expressionLines, onExpressionLinesChange, onEvaluationResultChange }: ExpressionDropZoneProps) {
   const [draggedOverLineIndex, setDraggedOverLineIndex] = useState<number | null>(null);
   const [draggedOverPillInfo, setDraggedOverPillInfo] = useState<{lineIndex: number, pillIndex: number} | null>(null);
   const [nextExpectedPerLine, setNextExpectedPerLine] = useState<(PillCategory | null)[]>([]);
@@ -101,7 +94,7 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       if (currentTargetElement) {
         currentTargetElement.classList.add('animate-pop');
         setTimeout(() => {
-          if (currentTargetElement) { // Check if element still exists
+          if (currentTargetElement) { 
             currentTargetElement.classList.remove('animate-pop');
           }
         }, 300);
@@ -182,14 +175,16 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
 
   const handleClearExpression = () => {
     onExpressionLinesChange(expressionLines.map(() => []));
+    onEvaluationResultChange(null);
     resetErrorHighlight();
   };
 
   const handleCheckSyntax = async () => {
-    const codeToVerify = generateRacketCode(expressionLines); // Use the imported function
+    const codeToVerify = generateRacketCode(expressionLines); 
 
     if (!codeToVerify.trim()) {
         toast({ title: "Empty Expression", description: "There's nothing to check.", variant: "default" });
+        onEvaluationResultChange("// Expression is empty");
         return;
     }
 
@@ -199,14 +194,17 @@ export function ExpressionDropZone({ expressionLines, onExpressionLinesChange }:
       const result = await checkSyntaxAction(codeToVerify);
       if (result.isValid) {
         toast({ title: "Syntax OK!", description: result.message, variant: "default" });
+        onEvaluationResultChange(result.simulatedEvaluation || "// Code is valid. Evaluation output will appear here.");
       } else {
         toast({ title: "Syntax Issue", description: result.message, variant: "destructive" });
         if (result.errorLineIndex !== undefined && result.errorLineIndex !== null) {
           setErrorLineHighlight(result.errorLineIndex);
         }
+        onEvaluationResultChange(null); 
       }
     } catch (error) {
       toast({ title: "Error", description: "Could not check syntax.", variant: "destructive" });
+      onEvaluationResultChange("// Error during syntax check.");
     }
   };
 

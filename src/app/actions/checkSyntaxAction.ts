@@ -7,7 +7,8 @@ import { PILL_SPECS } from '@/config/pills';
 interface SyntaxCheckResult {
   isValid: boolean;
   message: string;
-  errorLineIndex?: number | null; 
+  errorLineIndex?: number | null;
+  simulatedEvaluation?: string | null; 
 }
 
 const findPillSpecByLabel = (label: string): PillSpec | undefined => {
@@ -60,7 +61,7 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
   const originalLinesForContext = code.split('\n');
 
   if (lines.every(line => line.trim() === '')) {
-    return { isValid: true, message: "Expression is empty." };
+    return { isValid: true, message: "Expression is empty.", simulatedEvaluation: "// Expression is empty" };
   }
 
   let globalParenBalance = 0;
@@ -106,22 +107,14 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
     const tokens = tokenize(lineStr);
     if (tokens.length === 0) continue;
 
-    // Atoms (numbers, strings, symbols not in a list) are generally valid on their own
     const isLikelyAtom = tokens.length === 1 && !tokens[0].includes('(') && !tokens[0].includes(')');
     if (isLikelyAtom) {
         const atomToken = tokens[0];
-        if (/^\d+(\.\d+)?$/.test(atomToken)) { // Number
-            /* valid atom */
-        } else if (/^".*"$/.test(atomToken)) { // String
-            /* valid atom */
-        } else if (/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(atomToken)) { // Symbol/Variable
-            /* valid atom */
-        } else if (atomToken === '#t' || atomToken === '#f' || atomToken === '#true' || atomToken === '#false') { // Booleans
-            /* valid atom */
-        } else {
-            // return { isValid: false, message: `Syntax Error on line ${i + 1}: Invalid standalone token '${atomToken}'.`, errorLineIndex: i };
-        }
-        continue; // Assume valid atom for now
+        if (/^\d+(\.\d+)?$/.test(atomToken)) { /* valid atom */ } 
+        else if (/^".*"$/.test(atomToken)) { /* valid atom */ } 
+        else if (/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(atomToken)) { /* valid atom */ } 
+        else if (atomToken === '#t' || atomToken === '#f' || atomToken === '#true' || atomToken === '#false') { /* valid atom */ }
+        continue; 
     }
     
     if (tokens[0] !== '(') {
@@ -131,17 +124,15 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
       return { isValid: false, message: `Syntax Error on line ${i + 1}: Expected expression to end with ')'. Line: ${originalLinesForContext[i]}`, errorLineIndex: i };
     }
 
-    const sExprTokens = tokens.slice(1, -1); // Content inside the top-level parentheses
-    if (sExprTokens.length === 0) { // e.g. line was `( )` which is valid (empty list)
+    const sExprTokens = tokens.slice(1, -1); 
+    if (sExprTokens.length === 0) { 
         continue;
     }
 
     const head = sExprTokens[0];
     const args = sExprTokens.slice(1);
 
-    // Check for prefix notation: head should be function/operator/keyword, not a raw value
     if (/^\d+(\.\d+)?$/.test(head) || (/^".*"$/.test(head) && head !== '""') ) {
-      // An exception is a list of one element e.g. `(1)` or `("foo")`
       if (sExprTokens.length > 1) {
          return { isValid: false, message: `Syntax Error on line ${i + 1}: Operator/function expected. Found value '${head}' at the start of an expression.`, errorLineIndex: i };
       }
@@ -151,24 +142,22 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
 
     if (spec) {
       if (spec.expects) {
-        const minExpectedArgs = spec.expects.length; // This is a simplification
+        const minExpectedArgs = spec.expects.length; 
         
-        // More nuanced arity checks (very basic examples)
         if (head === 'define') {
-          if (args.length < 1) { // (define x) is not valid, (define x 10) is. (define (f x) body) args.length > 1
+          if (args.length < 1) { 
             return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' needs at least a name and a value/body. Example: (define x 10).`, errorLineIndex: i };
           }
           const varOrFuncName = args[0];
-          if (varOrFuncName.startsWith('(') && varOrFuncName.endsWith(')')) { // (define (f x) ...)
-            // Basic check for function definition form
+          if (varOrFuncName.startsWith('(') && varOrFuncName.endsWith(')')) { 
             const funcDefTokens = tokenize(varOrFuncName);
-            if (funcDefTokens.length < 2 || funcDefTokens[0] !== '(' || funcDefTokens[funcDefTokens.length-1] !== ')') { // ( name ... )
+            if (funcDefTokens.length < 2 || funcDefTokens[0] !== '(' || funcDefTokens[funcDefTokens.length-1] !== ')') { 
                  return { isValid: false, message: `Syntax Error on line ${i + 1}: Malformed function definition in 'define'. Expected (define (func-name args...) body).`, errorLineIndex: i };
             }
-            if (args.length < 2) { // Needs a body
+            if (args.length < 2) { 
                  return { isValid: false, message: `Syntax Error on line ${i + 1}: Function definition in 'define' is missing a body.`, errorLineIndex: i };
             }
-          } else { // (define x value)
+          } else { 
              if (args.length < 2) {
                 return { isValid: false, message: `Syntax Error on line ${i + 1}: 'define' expects a variable and a value. Example: (define x 10).`, errorLineIndex: i };
              }
@@ -177,24 +166,40 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
              }
           }
         } else if (head === 'list' || head === '+' || head === '-' || head === '=') {
-          // These are variadic or typically take 2+ for binary ops.
-          // '+' and '-' can be unary e.g. (- 5)
-          if ((head === '+' || head === '-' || head === '=') && args.length === 0 && spec.expects.length > 0) { // (+), (=) often an error without specific context
-            // return { isValid: false, message: `Syntax Error on line ${i + 1}: Operator '${head}' usually expects arguments.`, errorLineIndex: i };
+          if ((head === '+' || head === '-' || head === '=') && args.length === 0 && spec.expects.length > 0) {
           }
         } else if (args.length < minExpectedArgs) {
            return { isValid: false, message: `Syntax Error on line ${i + 1}: Not enough arguments for '${head}'. Expected ${minExpectedArgs}, got ${args.length}.`, errorLineIndex: i };
         }
-        // Note: Max arity check could also be added if PillSpec defines it.
       }
     } else {
-      // Head is not a known pill spec. Could be user-defined func or variable.
-      // For it to be in operator position, it must look like a symbol.
       if (!/^[a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*$/.test(head) && !head.startsWith("'") && head !== "...") {
-         // return { isValid: false, message: `Syntax Error on line ${i + 1}: Unknown function, operator, or keyword '${head}'.`, errorLineIndex: i };
       }
     }
   }
+  
+  let simulatedEvaluation: string | null = "Evaluation display area. (Actual evaluation not implemented)";
+  const trimmedCode = code.trim();
 
-  return { isValid: true, message: "AI Check: Syntax appears plausible (enhanced heuristics)." };
+  if (lines.length === 1) { // Very simple simulation for single line expressions
+    if (trimmedCode === "(+ 1 2)") {
+      simulatedEvaluation = "3";
+    } else if (trimmedCode === "(list 1 2 3)") {
+      simulatedEvaluation = "'(1 2 3)";
+    } else if (trimmedCode === "(define x 10)") {
+      simulatedEvaluation = "// x defined";
+    } else if (trimmedCode.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)) {
+       simulatedEvaluation = `// ${trimmedCode.match(/^\(define\s+([a-zA-Z_?!+\-*\/<>=][\w?!+\-*\/<>=.]*)\s+(.*)\)$/)?.[1]} defined`;
+    } else if (/^\([\w?!+\-*\/<>=.]+(\s+[\w".?!+\-*\/<>=]+)*\)$/.test(trimmedCode)) {
+       simulatedEvaluation = "Expression is valid. (Simulated output)";
+    } else if (!trimmedCode.includes('(') && !trimmedCode.includes(')') && trimmedCode.length > 0) {
+        simulatedEvaluation = trimmedCode; // Echo atoms
+    }
+  } else if (lines.length > 1) {
+    simulatedEvaluation = "Multiple lines are valid. (Simulated output for multi-line)";
+  }
+
+
+  return { isValid: true, message: "AI Check: Syntax appears plausible (enhanced heuristics).", simulatedEvaluation };
 }
+
