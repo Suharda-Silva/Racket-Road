@@ -14,31 +14,48 @@ export function LiveCodeView({ expressionLines }: LiveCodeViewProps) {
     return lines
       .map(line => {
         if (line.length === 0) {
-          return ''; // Skip empty lines
+          return ''; 
         }
         
         const lineCode = line.map(pill => pill.label).join(' ');
 
-        // Heuristic for outer parentheses:
-        // - If it starts with 'define', it's likely a top-level form like (define x 10)
-        // - If it starts with a keyword that typically forms a block (like 'list', 'cond', 'lambda' - though we don't have all yet),
-        //   and has multiple elements, it's also likely a self-contained S-expression.
-        // - Otherwise, wrap it in parentheses.
-        const firstPill = line[0];
-        if (firstPill?.id === 'define' || 
-            (firstPill?.category === 'keyword' && line.length > 1) ) { // e.g. (list 1 2 3)
-            return lineCode;
+        // If it's a single pill that's a variable, a number, or a string literal.
+        // These are considered "atoms" and don't need outer parentheses.
+        if (line.length === 1) {
+            const pill = line[0];
+            if (pill.category === 'variable' || 
+                (pill.category === 'list_value' && 
+                 (/^\d+(\s\d+)*$/.test(pill.label) || /^".*"$/.test(pill.label) || pill.label === '#t' || pill.label === '#f'))) {
+                return lineCode; 
+            }
         }
         
-        // Avoid wrapping already parenthesized user input, if they typed it like that
-        // (This is a basic check and might not cover all cases of user-typed parens)
+        // If the user has already typed something that looks like a fully formed S-expression
+        // (e.g. '(1 2 3) or (begin ...))
+        // This is a basic check and might not cover all complex user inputs perfectly.
         if (lineCode.startsWith('(') && lineCode.endsWith(')')) {
-            return lineCode;
+            let balance = 0;
+            let validSExpr = true;
+            for (let i = 0; i < lineCode.length; i++) {
+                if (lineCode[i] === '(') balance++;
+                else if (lineCode[i] === ')') balance--;
+                if (balance < 0) { // Closing paren before matching open
+                    validSExpr = false;
+                    break;
+                }
+                if (balance === 0 && i < lineCode.length - 1 && lineCode.substring(i+1).trim() !== "") { // e.g. (foo) (bar)
+                    validSExpr = false; 
+                    break;
+                }
+            }
+            if (balance === 0 && validSExpr) return lineCode;
         }
-
+        
+        // Default: wrap with parentheses to form an S-expression.
+        // This includes `define` forms, e.g., (define x 10)
         return `(${lineCode})`;
       })
-      .filter(lineStr => lineStr.trim() !== '' && lineStr.trim() !== '()') // Filter out completely empty or "()" lines
+      .filter(lineStr => lineStr.trim() !== '' && lineStr.trim() !== '()') 
       .join('\n');
   };
 
