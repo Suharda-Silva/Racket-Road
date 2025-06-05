@@ -51,7 +51,16 @@ export function PillPalette() {
                 <AccordionContent className="pb-2 pl-2 pr-1 pt-1">
                   <div className="grid grid-cols-2 gap-2">
                     {groupedPills[category].map((spec) => (
-                      <Pill key={spec.id} pill={spec} isDraggable />
+                      <Pill 
+                        key={spec.id} 
+                        pill={spec} 
+                        draggable={true}
+                        showGrip={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('application/racket-pill', JSON.stringify(spec));
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                      />
                     ))}
                   </div>
                 </AccordionContent>
