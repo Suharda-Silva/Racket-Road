@@ -3,7 +3,7 @@
 
 import type { PillSpec } from '@/types';
 import { PILL_SPECS } from '@/config/pills';
-import { evaluateRacket } from '@/ai/flows/evaluate-racket-flow';
+import { evaluateRacket, type EvaluateRacketOutput } from '@/ai/flows/evaluate-racket-flow'; // Output type might not be needed if it's just string
 
 interface SyntaxCheckResult {
   isValid: boolean;
@@ -176,35 +176,38 @@ export async function checkSyntaxAction(code: string): Promise<SyntaxCheckResult
   
   // If all local syntax checks passed, proceed to AI evaluation
   try {
-    const aiResponse = await evaluateRacket({ racketCode: code });
+    // evaluateRacket now returns Promise<string>
+    const aiResponseString = await evaluateRacket({ racketCode: code });
     
-    // The AI might still say the syntax is bad (evaluationSuccess: false) even if local checks pass.
-    // We can use AI's success flag to potentially override local `isValid`, or just use its message.
-    // For now, let's prioritize AI's evaluation for the `simulatedEvaluation` string.
-    // If AI reports an evaluation error, it's often more insightful than a generic "syntax plausible".
-    
-    let finalMessage = "Syntax appears plausible.";
-    if (aiResponse.evaluationSuccess) {
-        finalMessage = "AI Check: Code evaluated successfully.";
+    const isAIValid = !aiResponseString.startsWith("Error:");
+    let finalMessage = aiResponseString; // The AI response is the message
+
+    if (isAIValid && aiResponseString === "// Expression is empty") {
+      finalMessage = "Expression is empty."; // Nicer message for this specific case
+    } else if (isAIValid) {
+      // For other valid cases, we might prepend a success indicator for the toast.
+      // The AI string itself is the primary evaluation detail.
+      finalMessage = `AI Check: ${aiResponseString}`;
     } else {
-        // If AI says evaluation failed, it's likely an evaluation error or a more subtle syntax error.
-        finalMessage = `AI Check: ${aiResponse.evaluationResult}`; // Show AI's error/reason.
+      // For errors, the AI string already starts with "Error:"
+      finalMessage = `AI Check: ${aiResponseString}`;
     }
 
     return { 
-      isValid: aiResponse.evaluationSuccess, // Let AI's success dictate overall validity for now
+      isValid: isAIValid,
       message: finalMessage, 
-      simulatedEvaluation: aiResponse.evaluationResult,
+      simulatedEvaluation: aiResponseString, // Store the direct AI string
       errorLineIndex: null // AI doesn't reliably give line numbers for evaluation errors
     };
 
   } catch (e) {
     console.error("Error calling AI evaluation flow:", e);
     return {
-      isValid: false, // Indicate failure if AI call itself fails
-      message: "AI Evaluation Error: Could not get simulated output. Syntax might still be plausible based on local checks.",
+      isValid: false, 
+      message: "AI Evaluation Service Error: Could not get simulated output. Please try again.",
       simulatedEvaluation: "// AI evaluation service failed.",
       errorLineIndex: null
     };
   }
 }
+
